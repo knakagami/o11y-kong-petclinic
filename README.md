@@ -151,6 +151,30 @@ env:
 - **kubectl**: Kubernetes CLI ツール
 - **Helm**: Kubernetes 用パッケージマネージャー (v3.0+)
 - **Git**: バージョン管理
+- **Docker**: Python版GenAI Serviceのビルドに必要
+
+### Docker権限の設定（重要）
+
+Python版GenAI Serviceをビルドする場合、一般ユーザーがdockerコマンドを実行できる必要があります。
+
+```bash
+# 現在のユーザーをdockerグループに追加
+sudo usermod -aG docker $USER
+
+# 設定を反映（以下のいずれか）
+# 方法1: セッション再ログイン（推奨）
+exit
+# SSH/ターミナルに再接続
+
+# 方法2: 新しいグループセッションを開始
+newgrp docker
+
+# 確認: dockerコマンドがsudoなしで実行できることを確認
+docker ps
+docker images
+```
+
+**注意**: dockerグループへの追加は、rootユーザーと同等の権限を付与することになります。セキュリティ上のリスクを理解した上で実施してください。
 
 ### システム要件
 - **メモリ**: 最低 4GB RAM (8GB 推奨)

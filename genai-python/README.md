@@ -62,6 +62,23 @@ LLMが自動的に適切な関数を呼び出します：
 - Docker（コンテナビルド用）
 - OpenAI APIキーまたはAzure OpenAI設定
 
+#### Docker権限の設定
+
+一般ユーザー（ubuntu等）でdockerコマンドを実行する場合、dockerグループへの追加が必要です：
+
+```bash
+# 現在のユーザーをdockerグループに追加
+sudo usermod -aG docker $USER
+
+# セッション再ログイン、または
+newgrp docker
+
+# 確認
+docker ps
+```
+
+**注意**: dockerグループへの追加は、rootユーザーと同等の権限を付与します。
+
 ### ローカル開発環境
 
 #### 1. 依存関係のインストール
