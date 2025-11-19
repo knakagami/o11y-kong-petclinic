@@ -147,4 +147,7 @@ Feel free to open an issue for questions or discussion.
 ## License
 
 By contributing, you agree that your contributions will be licensed under the same license as the project (Apache License 2.0).
+<<<<<<< HEAD
 
+=======
+>>>>>>> 6352f2a3100c0f5bc96b561c900b7d04c5b97780

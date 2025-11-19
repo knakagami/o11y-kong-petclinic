@@ -96,8 +96,13 @@ kubectl cluster-info
 ### 1. Clone the Repository
 
 ```bash
+<<<<<<< HEAD
 git clone <your-repository-url>
 cd o11y-kong
+=======
+git clone https://github.com/knakagami/o11y-kong-petclinic.git
+cd o11y-kong-petclinic
+>>>>>>> 6352f2a3100c0f5bc96b561c900b7d04c5b97780
 ```
 
 ### 2. Deploy Microservices
@@ -494,4 +499,7 @@ This project is based on Spring PetClinic, which is licensed under the Apache Li
 - Setting up automated backups
 - Implementing proper monitoring and alerting
 - Using persistent storage for stateful services
+<<<<<<< HEAD
 
+=======
+>>>>>>> 6352f2a3100c0f5bc96b561c900b7d04c5b97780
