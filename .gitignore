@@ -1,0 +1,26 @@
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# Secrets (if any are added locally)
+secrets/
+*.key
+*.pem
+
+# Kubernetes local configs
+kubeconfig
+*.kubeconfig
