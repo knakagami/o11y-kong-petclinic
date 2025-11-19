@@ -1,25 +1,28 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: genai-service
+  name: genai-python
   namespace: petclinic
   labels:
-    app: genai-service
+    app: genai-python
     tier: backend
+    language: python
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: genai-service
+      app: genai-python
   template:
     metadata:
       labels:
-        app: genai-service
+        app: genai-python
         tier: backend
+        language: python
     spec:
       containers:
-      - name: genai-service
-        image: springcommunity/spring-petclinic-genai-service:latest
+      - name: genai-python
+        image: genai-python:latest
+        imagePullPolicy: Never  # For local k3s, use local image
         ports:
         - containerPort: 8084
           name: http
@@ -29,14 +32,20 @@ spec:
           value: "http://config-server:8888"
         - name: EUREKA_SERVER_URL
           value: "http://discovery-server:8761/eureka"
-        - name: MANAGEMENT_TRACING_ENABLED
-          value: "false"
-        # Optional: Set these environment variables if you want to use GenAI features
+        - name: CUSTOMERS_SERVICE_URL
+          value: "http://customers-service:8081"
+        - name: VETS_SERVICE_URL
+          value: "http://vets-service:8083"
+        # OpenAI Configuration (required for GenAI features)
+        # Uncomment and set these environment variables or create a Secret
         # - name: OPENAI_API_KEY
         #   valueFrom:
         #     secretKeyRef:
         #       name: genai-secrets
         #       key: openai-api-key
+        # - name: OPENAI_MODEL
+        #   value: "gpt-4o-mini"
+        # Azure OpenAI Configuration (alternative to OpenAI)
         # - name: AZURE_OPENAI_KEY
         #   valueFrom:
         #     secretKeyRef:
@@ -47,6 +56,8 @@ spec:
         #     secretKeyRef:
         #       name: genai-secrets
         #       key: azure-openai-endpoint
+        # - name: AZURE_OPENAI_DEPLOYMENT
+        #   value: "gpt-4o"
         resources:
           limits:
             memory: "512Mi"
@@ -56,18 +67,24 @@ spec:
             cpu: "250m"
         livenessProbe:
           httpGet:
-            path: /actuator/health
+            path: /health
             port: 8084
-          initialDelaySeconds: 120
+          initialDelaySeconds: 60
           periodSeconds: 10
           timeoutSeconds: 5
           failureThreshold: 3
         readinessProbe:
           httpGet:
-            path: /actuator/health
+            path: /health
             port: 8084
-          initialDelaySeconds: 90
+          initialDelaySeconds: 30
           periodSeconds: 5
           timeoutSeconds: 3
           failureThreshold: 3
+        volumeMounts:
+        - name: vectorstore
+          mountPath: /app/vectorstore
+      volumes:
+      - name: vectorstore
+        emptyDir: {}
 

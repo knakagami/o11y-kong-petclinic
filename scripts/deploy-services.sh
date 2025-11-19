@@ -94,8 +94,11 @@ kubectl apply -f k8s/visits-service/ &
 print_message "$BLUE" "Deploying Vets Service..."
 kubectl apply -f k8s/vets-service/ &
 
-print_message "$BLUE" "Deploying GenAI Service..."
+print_message "$BLUE" "Deploying GenAI Service (Java)..."
 kubectl apply -f k8s/genai-service/ &
+
+print_message "$BLUE" "Deploying GenAI Python Service..."
+kubectl apply -f k8s/genai-python/ &
 
 # Wait for all background jobs to complete
 wait
@@ -108,6 +111,7 @@ wait_for_deployment petclinic customers-service 300 &
 wait_for_deployment petclinic visits-service 300 &
 wait_for_deployment petclinic vets-service 300 &
 wait_for_deployment petclinic genai-service 300 &
+wait_for_deployment petclinic genai-python 300 &
 
 # Wait for all health checks
 wait
@@ -151,7 +155,8 @@ echo "- Discovery Server: http://discovery-server.petclinic.svc.cluster.local:87
 echo "- Customers Service: http://customers-service.petclinic.svc.cluster.local:8081"
 echo "- Visits Service: http://visits-service.petclinic.svc.cluster.local:8082"
 echo "- Vets Service: http://vets-service.petclinic.svc.cluster.local:8083"
-echo "- GenAI Service: http://genai-service.petclinic.svc.cluster.local:8084"
+echo "- GenAI Service (Java): http://genai-service.petclinic.svc.cluster.local:8084"
+echo "- GenAI Python Service: http://genai-python.petclinic.svc.cluster.local:8085"
 echo "- Admin Server: http://admin-server.petclinic.svc.cluster.local:9090"
 echo ""
 

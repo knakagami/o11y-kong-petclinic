@@ -181,6 +181,29 @@ config:
 plugin: file-log
 
 ---
+# Ingress for GenAI Python Service
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: genai-python-ingress
+  namespace: petclinic
+  annotations:
+    konghq.com/strip-path: "false"
+    kubernetes.io/ingress.class: kong
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - path: /api/genai-python
+        pathType: Prefix
+        backend:
+          service:
+            name: genai-python
+            port:
+              number: 8085
+
+---
 # Apply CORS and Prometheus plugins globally to all services
 # You can also apply plugins per-ingress by adding annotations:
 # konghq.com/plugins: cors,prometheus,rate-limiting

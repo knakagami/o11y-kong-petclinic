@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: genai-python
+  namespace: petclinic
+  labels:
+    app: genai-python
+    tier: backend
+    language: python
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8085
+    targetPort: 8084
+    protocol: TCP
+    name: http
+  selector:
+    app: genai-python
+

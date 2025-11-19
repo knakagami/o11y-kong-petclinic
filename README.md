@@ -12,15 +12,85 @@ Spring PetClinic マイクロサービスアプリケーションのクラウド
 
 ## 📋 目次
 
+- [オリジナルからのカスタマイズ](#オリジナルからのカスタマイズ)
 - [アーキテクチャ](#アーキテクチャ)
 - [前提条件](#前提条件)
 - [クイックスタート](#クイックスタート)
 - [API エンドポイント](#api-エンドポイント)
+- [GenAI Python Service](#genai-python-service)
 - [デプロイの詳細](#デプロイの詳細)
 - [Kong Gateway 設定](#kong-gateway-設定)
 - [監視と可観測性](#監視と可観測性)
 - [トラブルシューティング](#トラブルシューティング)
 - [クリーンアップ](#クリーンアップ)
+
+## 🔄 オリジナルからのカスタマイズ
+
+このプロジェクトは、[Spring PetClinic Microservices](https://github.com/spring-petclinic/spring-petclinic-microservices)をベースに、以下のカスタマイズを施しています：
+
+### 1. Kong API Gatewayへの置き換え ✨
+
+**変更内容:**
+- Spring Cloud Gatewayを**Kong API Gateway**に置き換え
+- Kubernetesネイティブなイングレスコントローラーとして実装
+- 高度なAPI管理機能を追加
+
+**メリット:**
+- エンタープライズグレードのAPI管理
+- プラグインエコシステム（レート制限、認証、ロギングなど）
+- Prometheusメトリクス統合
+- より優れたパフォーマンスとスケーラビリティ
+
+### 2. Python版GenAI Serviceの追加 🐍
+
+**新規追加:**
+- FastAPI + LangChainベースのPython実装
+- Java版と同等の機能を提供
+- ポート8085で並行稼働可能
+
+**特徴:**
+- LangChain Agentによる会話型AI
+- Chromaベクターストアを使用したRAG
+- OpenAI / Azure OpenAI対応
+- 詳細は[genai-python/README.md](genai-python/README.md)を参照
+
+**比較:**
+
+| 項目 | Java版 | Python版 |
+|-----|--------|---------|
+| フレームワーク | Spring Boot | FastAPI |
+| AI統合 | Spring AI | LangChain |
+| ベクターストア | SimpleVectorStore | Chroma |
+| ポート | 8084 | 8085 |
+| Kong パス | `/api/genai` | `/api/genai-python` |
+
+### 3. Zipkin トレーシングの無効化 🔧
+
+**変更内容:**
+- GenAI Service（Java版）のZipkin依存を削除
+- CrashLoopBackOffの問題を解決
+
+**理由:**
+- Zipkinサーバーが未デプロイの環境でのエラー回避
+- シンプルなデプロイメント構成
+
+**実装:**
+```yaml
+# k8s/genai-service/deployment.yaml
+env:
+- name: MANAGEMENT_TRACING_ENABLED
+  value: "false"
+```
+
+### 4. Kubernetes最適化
+
+**追加機能:**
+- k3s対応のデプロイメント設定
+- NodePortサービスでの外部アクセス
+- ヘルスチェックプローブの最適化
+- リソース制限の適切な設定
+
+---
 
 ## 🏗️ アーキテクチャ
 
@@ -63,7 +133,8 @@ Spring PetClinic マイクロサービスアプリケーションのクラウド
 - **Customers Service** (8081): ペットオーナーとペットの管理
 - **Visits Service** (8082): 獣医診察記録の管理
 - **Vets Service** (8083): 獣医師情報の管理
-- **GenAI Service** (8084): AI 機能（オプション）
+- **GenAI Service** (8084): AI 機能（Java版、Spring AI使用）
+- **GenAI Python Service** (8085): AI 機能（Python版、FastAPI + LangChain使用）✨ **NEW**
 
 #### API Gateway
 - **Kong Gateway**: Spring Cloud Gateway を置き換える API ゲートウェイ
@@ -209,11 +280,30 @@ Content-Type: application/json
 GET http://localhost:32000/api/vet/vets
 ```
 
-#### GenAI Service（オプション）
+#### GenAI Service（Java版）
 
 ```bash
-# GenAI 機能にアクセス
-GET http://localhost:32000/api/genai/*
+# チャットボットAPI
+POST http://localhost:32000/api/genai/chatclient
+Content-Type: text/plain
+
+飼い主を全員教えてください
+```
+
+#### GenAI Python Service ✨
+
+```bash
+# チャットボットAPI（Python版）
+POST http://localhost:32000/api/genai-python/chatclient
+Content-Type: text/plain
+
+獣医師を全員教えてください
+
+# サービス情報
+GET http://localhost:32000/api/genai-python/info
+
+# ヘルスチェック
+GET http://localhost:32000/api/genai-python/health
 ```
 
 #### Admin Server
@@ -246,6 +336,88 @@ curl -X POST http://localhost:32000/api/customer/owners \
     "telephone": "0667890123"
   }'
 ```
+
+## 🐍 GenAI Python Service
+
+このプロジェクトには、FastAPIとLangChainを使用したPython実装のGenAI Serviceが含まれています。
+
+### 主な機能
+
+- **会話型AIチャットボット**: OpenAI / Azure OpenAI GPTモデル使用
+- **Function Calling**: 飼い主/ペット管理、獣医師検索
+- **RAG機能**: Chromaベクターストアによる獣医師データの意味検索
+- **会話履歴**: 10メッセージまでのコンテキスト保持
+
+### ローカルビルドとデプロイ
+
+#### 1. Dockerイメージのビルド
+
+```bash
+cd genai-python
+chmod +x build-docker.sh
+./build-docker.sh
+```
+
+#### 2. k3sへのイメージインポート
+
+```bash
+# イメージをk3sにインポート
+docker save genai-python:latest | sudo k3s ctr images import -
+```
+
+#### 3. OpenAI APIキーの設定
+
+```bash
+# Kubernetes Secretとして設定
+kubectl create secret generic genai-secrets \
+  --from-literal=openai-api-key="sk-your-api-key-here" \
+  -n petclinic
+
+# または、deploymentの環境変数を直接編集
+kubectl edit deployment genai-python -n petclinic
+```
+
+#### 4. デプロイ
+
+```bash
+# GenAI Python Serviceのみデプロイ
+kubectl apply -f k8s/genai-python/
+
+# または、全サービス一括デプロイ（スクリプト使用）
+./scripts/deploy-services.sh
+```
+
+#### 5. 動作確認
+
+```bash
+# Pod状態確認
+kubectl get pods -n petclinic -l app=genai-python
+
+# ログ確認
+kubectl logs -f deployment/genai-python -n petclinic
+
+# Kong経由でテスト
+curl -X POST http://localhost:32000/api/genai-python/chatclient \
+  -H "Content-Type: text/plain" \
+  -d "飼い主を全員教えてください"
+```
+
+### Java版との違い
+
+| 項目 | Java版 | Python版 |
+|-----|--------|---------|
+| フレームワーク | Spring Boot + Spring AI | FastAPI + LangChain |
+| ベクターストア | SimpleVectorStore | Chroma |
+| デプロイ | 公式イメージ使用 | ローカルビルド必須 |
+| ポート（K8s） | 8084 | 8085 |
+| Kong パス | `/api/genai` | `/api/genai-python` |
+| 起動時間 | 約120秒 | 約30秒 |
+
+### トラブルシューティング
+
+詳細なトラブルシューティング情報は [genai-python/README.md](genai-python/README.md) を参照してください。
+
+---
 
 ## 📦 デプロイの詳細
 
