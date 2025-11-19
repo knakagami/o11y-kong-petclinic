@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: discovery-server
+  namespace: petclinic
+  labels:
+    app: discovery-server
+    tier: infrastructure
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8761
+    targetPort: 8761
+    protocol: TCP
+    name: http
+  selector:
+    app: discovery-server
+

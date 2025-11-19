@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: discovery-server
+  namespace: petclinic
+  labels:
+    app: discovery-server
+    tier: infrastructure
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: discovery-server
+  template:
+    metadata:
+      labels:
+        app: discovery-server
+        tier: infrastructure
+    spec:
+      containers:
+      - name: discovery-server
+        image: springcommunity/spring-petclinic-discovery-server:latest
+        ports:
+        - containerPort: 8761
+          name: http
+          protocol: TCP
+        env:
+        - name: CONFIG_SERVER_URL
+          value: "http://config-server:8888"
+        resources:
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8761
+          initialDelaySeconds: 120
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8761
+          initialDelaySeconds: 90
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+

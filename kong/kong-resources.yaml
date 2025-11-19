@@ -1,0 +1,208 @@
+# Kong Ingress Resources for Spring PetClinic Microservices
+# This file defines the routing from Kong Gateway to backend services
+
+---
+# Ingress for Customers Service
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: customers-ingress
+  namespace: petclinic
+  annotations:
+    konghq.com/strip-path: "false"
+    kubernetes.io/ingress.class: kong
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - path: /api/customer
+        pathType: Prefix
+        backend:
+          service:
+            name: customers-service
+            port:
+              number: 8081
+
+---
+# Ingress for Visits Service
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: visits-ingress
+  namespace: petclinic
+  annotations:
+    konghq.com/strip-path: "false"
+    kubernetes.io/ingress.class: kong
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - path: /api/visit
+        pathType: Prefix
+        backend:
+          service:
+            name: visits-service
+            port:
+              number: 8082
+
+---
+# Ingress for Vets Service
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: vets-ingress
+  namespace: petclinic
+  annotations:
+    konghq.com/strip-path: "false"
+    kubernetes.io/ingress.class: kong
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - path: /api/vet
+        pathType: Prefix
+        backend:
+          service:
+            name: vets-service
+            port:
+              number: 8083
+
+---
+# Ingress for GenAI Service
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: genai-ingress
+  namespace: petclinic
+  annotations:
+    konghq.com/strip-path: "false"
+    kubernetes.io/ingress.class: kong
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - path: /api/genai
+        pathType: Prefix
+        backend:
+          service:
+            name: genai-service
+            port:
+              number: 8084
+
+---
+# Ingress for Admin Server (optional - for management UI)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: admin-ingress
+  namespace: petclinic
+  annotations:
+    konghq.com/strip-path: "false"
+    kubernetes.io/ingress.class: kong
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - path: /admin
+        pathType: Prefix
+        backend:
+          service:
+            name: admin-server
+            port:
+              number: 9090
+
+---
+# Kong Plugin: Rate Limiting (example)
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: rate-limiting
+  namespace: petclinic
+config:
+  minute: 100
+  policy: local
+plugin: rate-limiting
+
+---
+# Kong Plugin: CORS
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: cors
+  namespace: petclinic
+config:
+  origins:
+  - "*"
+  methods:
+  - GET
+  - POST
+  - PUT
+  - DELETE
+  - PATCH
+  - OPTIONS
+  headers:
+  - Accept
+  - Accept-Version
+  - Content-Length
+  - Content-MD5
+  - Content-Type
+  - Date
+  - X-Auth-Token
+  - Authorization
+  exposed_headers:
+  - X-Auth-Token
+  credentials: true
+  max_age: 3600
+plugin: cors
+
+---
+# Kong Plugin: Prometheus (for metrics collection)
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: prometheus
+  namespace: petclinic
+plugin: prometheus
+
+---
+# Kong Plugin: Request Logging
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: request-logging
+  namespace: petclinic
+config:
+  log_level: info
+plugin: file-log
+
+---
+# Apply CORS and Prometheus plugins globally to all services
+# You can also apply plugins per-ingress by adding annotations:
+# konghq.com/plugins: cors,prometheus,rate-limiting
+apiVersion: configuration.konghq.com/v1
+kind: KongClusterPlugin
+metadata:
+  name: global-cors
+  annotations:
+    kubernetes.io/ingress.class: kong
+  labels:
+    global: "true"
+config:
+  origins:
+  - "*"
+  methods:
+  - GET
+  - POST
+  - PUT
+  - DELETE
+  - PATCH
+  - OPTIONS
+  credentials: true
+  max_age: 3600
+plugin: cors
+

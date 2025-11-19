@@ -1,0 +1,100 @@
+# Kong Helm Chart Values for k3s deployment
+# This configuration sets up Kong Gateway in DB-less mode
+
+# Kong Gateway configuration
+gateway:
+  image:
+    repository: kong/kong-gateway
+    tag: "3.8"
+  
+  # Environment variables for Kong
+  env:
+    # Database mode - using DB-less (declarative) configuration
+    database: "off"
+    
+    # Declarative configuration file
+    declarative_config: /kong_dbless/kong.yml
+    
+    # Proxy settings
+    proxy_listen: 0.0.0.0:8000, 0.0.0.0:8443 ssl
+    
+    # Admin API settings
+    admin_listen: 0.0.0.0:8001, 0.0.0.0:8444 ssl
+    admin_gui_listen: 0.0.0.0:8002, 0.0.0.0:8445 ssl
+    
+    # Enable Kong Manager (GUI)
+    admin_gui_url: http://localhost:8002
+    
+    # Logging
+    log_level: info
+    
+    # Plugins
+    plugins: bundled
+    
+  # Admin API service
+  admin:
+    enabled: true
+    type: NodePort
+    http:
+      enabled: true
+      servicePort: 8001
+      nodePort: 32001
+    
+  # Proxy service - main entry point for API traffic
+  proxy:
+    enabled: true
+    type: NodePort
+    http:
+      enabled: true
+      servicePort: 8000
+      nodePort: 32000
+    https:
+      enabled: true
+      servicePort: 8443
+      nodePort: 32443
+
+# Ingress Controller configuration
+ingressController:
+  enabled: true
+  installCRDs: true
+  
+  image:
+    repository: kong/kubernetes-ingress-controller
+    tag: "3.3"
+  
+  env:
+    # Publish service for Kong proxy
+    publish_service: kong/kong-gateway-proxy
+    
+  # Enable gateway discovery
+  gatewayDiscovery:
+    enabled: true
+    
+  # Ingress class
+  ingressClass: kong
+
+# PostgreSQL - disabled for DB-less mode
+postgresql:
+  enabled: false
+
+# Service account
+serviceAccount:
+  create: true
+  name: kong-serviceaccount
+
+# Autoscaling (optional)
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 80
+
+# Resources
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+

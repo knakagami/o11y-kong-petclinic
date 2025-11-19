@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vets-service
+  namespace: petclinic
+  labels:
+    app: vets-service
+    tier: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vets-service
+  template:
+    metadata:
+      labels:
+        app: vets-service
+        tier: backend
+    spec:
+      containers:
+      - name: vets-service
+        image: springcommunity/spring-petclinic-vets-service:latest
+        ports:
+        - containerPort: 8083
+          name: http
+          protocol: TCP
+        env:
+        - name: CONFIG_SERVER_URL
+          value: "http://config-server:8888"
+        - name: EUREKA_SERVER_URL
+          value: "http://discovery-server:8761/eureka"
+        resources:
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8083
+          initialDelaySeconds: 120
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8083
+          initialDelaySeconds: 90
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+
