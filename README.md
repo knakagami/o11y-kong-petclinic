@@ -1,22 +1,30 @@
-# Spring PetClinic with Kong API Gateway on Kubernetes
+# Kong API Gateway を使用した Spring PetClinic on Kubernetes
 
-A cloud-native implementation of the Spring PetClinic microservices application, using Kong API Gateway for API management and deployed on Kubernetes (k3s).
+Spring PetClinic マイクロサービスアプリケーションのクラウドネイティブ実装です。API 管理に Kong API Gateway を使用し、Kubernetes (k3s) 上にデプロイします。
 
-## 📋 Table of Contents
+> **⚠️ 重要な注意事項**
+> 
+> このプロジェクトのコードは **Cursor AI** によって生成されました。
+> - すべてのKubernetesマニフェスト、デプロイメントスクリプト、設定ファイルはAIによって自動生成されています
+> - 予期しない動作や設定ミスが含まれる可能性があります
+> - 本番環境で使用する前に、すべての設定を十分に検証してください
+> - このプロジェクトはデモンストレーション目的であり、本番環境での使用は推奨されません
 
-- [Architecture](#architecture)
-- [Prerequisites](#prerequisites)
-- [Quick Start](#quick-start)
-- [API Endpoints](#api-endpoints)
-- [Deployment Details](#deployment-details)
-- [Kong Gateway Configuration](#kong-gateway-configuration)
-- [Monitoring and Observability](#monitoring-and-observability)
-- [Troubleshooting](#troubleshooting)
-- [Cleanup](#cleanup)
+## 📋 目次
 
-## 🏗️ Architecture
+- [アーキテクチャ](#アーキテクチャ)
+- [前提条件](#前提条件)
+- [クイックスタート](#クイックスタート)
+- [API エンドポイント](#api-エンドポイント)
+- [デプロイの詳細](#デプロイの詳細)
+- [Kong Gateway 設定](#kong-gateway-設定)
+- [監視と可観測性](#監視と可観測性)
+- [トラブルシューティング](#トラブルシューティング)
+- [クリーンアップ](#クリーンアップ)
 
-This project replaces the traditional Spring Cloud Gateway with Kong API Gateway, providing enhanced API management capabilities including rate limiting, authentication, and advanced routing.
+## 🏗️ アーキテクチャ
+
+このプロジェクトは、従来の Spring Cloud Gateway を Kong API Gateway に置き換え、レート制限、認証、高度なルーティングなどの強化された API 管理機能を提供します。
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -44,215 +52,210 @@ This project replaces the traditional Spring Cloud Gateway with Kong API Gateway
                     └──────────────────┘
 ```
 
-### Components
+### コンポーネント
 
-#### Infrastructure Services
-- **Config Server** (8888): Centralized configuration management
-- **Discovery Server** (8761): Eureka service registry for service discovery
-- **Admin Server** (9090): Spring Boot Admin for monitoring
+#### インフラストラクチャサービス
+- **Config Server** (8888): 集中設定管理
+- **Discovery Server** (8761): サービスディスカバリー用の Eureka サービスレジストリ
+- **Admin Server** (9090): 監視用の Spring Boot Admin
 
-#### Business Services
-- **Customers Service** (8081): Manages pet owners and their pets
-- **Visits Service** (8082): Manages veterinary visit records
-- **Vets Service** (8083): Manages veterinarian information
-- **GenAI Service** (8084): AI-powered features (optional)
+#### ビジネスサービス
+- **Customers Service** (8081): ペットオーナーとペットの管理
+- **Visits Service** (8082): 獣医診察記録の管理
+- **Vets Service** (8083): 獣医師情報の管理
+- **GenAI Service** (8084): AI 機能（オプション）
 
 #### API Gateway
-- **Kong Gateway**: API gateway replacing Spring Cloud Gateway
-  - Traffic routing and load balancing
-  - Rate limiting and throttling
-  - CORS handling
-  - Request/response transformation
-  - Metrics collection (Prometheus)
+- **Kong Gateway**: Spring Cloud Gateway を置き換える API ゲートウェイ
+  - トラフィックルーティングとロードバランシング
+  - レート制限とスロットリング
+  - CORS 処理
+  - リクエスト/レスポンス変換
+  - メトリクス収集（Prometheus）
 
-## 🔧 Prerequisites
+## 🔧 前提条件
 
-### Required Tools
-- **Kubernetes**: k3s, k8s, or any Kubernetes cluster (v1.24+)
-- **kubectl**: Kubernetes CLI tool
-- **Helm**: Package manager for Kubernetes (v3.0+)
-- **Git**: Version control
+### 必要なツール
+- **Kubernetes**: k3s、k8s、または任意の Kubernetes クラスター (v1.24+)
+- **kubectl**: Kubernetes CLI ツール
+- **Helm**: Kubernetes 用パッケージマネージャー (v3.0+)
+- **Git**: バージョン管理
 
-### System Requirements
-- **Memory**: Minimum 4GB RAM (8GB recommended)
-- **CPU**: 2+ cores
-- **Disk**: 10GB free space
+### システム要件
+- **メモリ**: 最低 4GB RAM (8GB 推奨)
+- **CPU**: 2+ コア
+- **ディスク**: 10GB 以上の空き容量
 
-### Verify Prerequisites
+### 前提条件の確認
 
 ```bash
-# Check Kubernetes
+# Kubernetes の確認
 kubectl version --client
 
-# Check Helm
+# Helm の確認
 helm version
 
-# Check cluster connection
+# クラスター接続の確認
 kubectl cluster-info
 ```
 
-## 🚀 Quick Start
+## 🚀 クイックスタート
 
-### 1. Clone the Repository
+### 1. リポジトリのクローン
 
 ```bash
-<<<<<<< HEAD
-git clone <your-repository-url>
-cd o11y-kong
-=======
 git clone https://github.com/knakagami/o11y-kong-petclinic.git
 cd o11y-kong-petclinic
->>>>>>> 6352f2a3100c0f5bc96b561c900b7d04c5b97780
 ```
 
-### 2. Deploy Microservices
+### 2. マイクロサービスのデプロイ
 
 ```bash
-# Make scripts executable
+# スクリプトに実行権限を付与
 chmod +x scripts/*.sh
 
-# Deploy all Spring PetClinic services
+# すべての Spring PetClinic サービスをデプロイ
 ./scripts/deploy-services.sh
 ```
 
-This script will:
-1. Create the `petclinic` namespace
-2. Deploy Config Server and wait for it to be ready
-3. Deploy Discovery Server (Eureka)
-4. Deploy all business services in parallel
-5. Deploy Admin Server
+このスクリプトは以下を実行します：
+1. `petclinic` namespace の作成
+2. Config Server のデプロイと起動待機
+3. Discovery Server (Eureka) のデプロイ
+4. すべてのビジネスサービスを並行デプロイ
+5. Admin Server のデプロイ
 
-### 3. Deploy Kong API Gateway
+### 3. Kong API Gateway のデプロイ
 
 ```bash
-# Deploy Kong Gateway with Ingress Controller
+# Ingress Controller 付き Kong Gateway をデプロイ
 ./scripts/deploy-kong.sh
 ```
 
-This script will:
-1. Add Kong Helm repository
-2. Install Kong using Helm with custom values
-3. Apply Kong Ingress resources for routing
-4. Configure plugins (CORS, rate limiting, Prometheus)
+このスクリプトは以下を実行します：
+1. Kong Helm リポジトリの追加
+2. カスタム値を使用した Helm による Kong のインストール
+3. ルーティング用 Kong Ingress リソースの適用
+4. プラグイン（CORS、レート制限、Prometheus）の設定
 
-### 4. Verify Deployment
+### 4. デプロイの確認
 
 ```bash
-# Check all pods are running
+# すべての Pod が実行中であることを確認
 kubectl get pods -n petclinic
 
-# Check services
+# サービスの確認
 kubectl get services -n petclinic
 
-# Check Kong pods
+# Kong Pod の確認
 kubectl get pods -n kong
 
-# Check ingress resources
+# Ingress リソースの確認
 kubectl get ingress -n petclinic
 ```
 
-## 🌐 API Endpoints
+## 🌐 API エンドポイント
 
-### Through Kong Gateway (NodePort: 32000)
+### Kong Gateway 経由（NodePort: 32000）
 
-All APIs are accessible through Kong Gateway at `http://localhost:32000` (or your node IP).
+すべての API は `http://localhost:32000`（またはノードの IP）で Kong Gateway 経由でアクセス可能です。
 
 #### Customers Service
 
 ```bash
-# List all customers
+# すべての顧客を一覧表示
 GET http://localhost:32000/api/customer/owners
 
-# Get customer by ID
+# ID で顧客を取得
 GET http://localhost:32000/api/customer/owners/{ownerId}
 
-# Create new customer
+# 新しい顧客を作成
 POST http://localhost:32000/api/customer/owners
 Content-Type: application/json
 {
-  "firstName": "John",
-  "lastName": "Doe",
-  "address": "123 Main St",
-  "city": "Springfield",
-  "telephone": "1234567890"
+  "firstName": "太郎",
+  "lastName": "山田",
+  "address": "東京都渋谷区1-2-3",
+  "city": "東京",
+  "telephone": "0312345678"
 }
 
-# Search customers by last name
+# 姓で顧客を検索
 GET http://localhost:32000/api/customer/owners/*/lastname/{lastName}
 
-# Get pet types
+# ペットタイプを取得
 GET http://localhost:32000/api/customer/petTypes
 ```
 
 #### Visits Service
 
 ```bash
-# Get visits for a pet
+# ペットの診察記録を取得
 GET http://localhost:32000/api/visit/owners/*/pets/{petId}/visits
 
-# Create a new visit
+# 新しい診察記録を作成
 POST http://localhost:32000/api/visit/owners/*/pets/{petId}/visits
 Content-Type: application/json
 {
   "date": "2024-01-15",
-  "description": "Regular checkup"
+  "description": "定期健診"
 }
 ```
 
 #### Vets Service
 
 ```bash
-# List all veterinarians
+# すべての獣医師を一覧表示
 GET http://localhost:32000/api/vet/vets
 ```
 
-#### GenAI Service (Optional)
+#### GenAI Service（オプション）
 
 ```bash
-# Access GenAI features
+# GenAI 機能にアクセス
 GET http://localhost:32000/api/genai/*
 ```
 
 #### Admin Server
 
 ```bash
-# Access Spring Boot Admin UI
+# Spring Boot Admin UI にアクセス
 GET http://localhost:32000/admin
 ```
 
-### Example curl Commands
+### curl コマンド例
 
 ```bash
-# Get all vets
+# すべての獣医師を取得
 curl http://localhost:32000/api/vet/vets
 
-# Get all pet types
+# すべてのペットタイプを取得
 curl http://localhost:32000/api/customer/petTypes
 
-# Get all owners
+# すべてのオーナーを取得
 curl http://localhost:32000/api/customer/owners
 
-# Create a new owner
+# 新しいオーナーを作成
 curl -X POST http://localhost:32000/api/customer/owners \
   -H "Content-Type: application/json" \
   -d '{
-    "firstName": "Jane",
-    "lastName": "Smith",
-    "address": "456 Oak Ave",
-    "city": "Portland",
-    "telephone": "5551234567"
+    "firstName": "花子",
+    "lastName": "佐藤",
+    "address": "大阪府大阪市北区4-5-6",
+    "city": "大阪",
+    "telephone": "0667890123"
   }'
 ```
 
-## 📦 Deployment Details
+## 📦 デプロイの詳細
 
 ### Namespace
 
-All PetClinic resources are deployed in the `petclinic` namespace, while Kong is deployed in the `kong` namespace.
+すべての PetClinic リソースは `petclinic` namespace にデプロイされ、Kong は `kong` namespace にデプロイされます。
 
-### Resource Limits
+### リソース制限
 
-Each service has the following default resource configuration:
+各サービスには以下のデフォルトリソース設定があります：
 
 ```yaml
 resources:
@@ -264,27 +267,27 @@ resources:
     cpu: "250m"
 ```
 
-### Health Checks
+### ヘルスチェック
 
-All services include:
-- **Liveness Probe**: Ensures pod is alive
-- **Readiness Probe**: Ensures pod is ready to accept traffic
+すべてのサービスには以下が含まれます：
+- **Liveness Probe**: Pod が生きていることを確認
+- **Readiness Probe**: Pod がトラフィックを受け入れる準備ができていることを確認
 
-Probes use the Spring Boot Actuator `/actuator/health` endpoint.
+プローブは Spring Boot Actuator の `/actuator/health` エンドポイントを使用します。
 
-### Service Dependencies
+### サービスの依存関係
 
-The deployment follows this order to respect dependencies:
-1. Config Server (no dependencies)
-2. Discovery Server (depends on Config Server)
-3. Business Services (depend on Config Server + Discovery Server)
-4. Admin Server (depends on Config Server + Discovery Server)
+デプロイは依存関係を尊重して以下の順序で行われます：
+1. Config Server（依存関係なし）
+2. Discovery Server（Config Server に依存）
+3. ビジネスサービス（Config Server + Discovery Server に依存）
+4. Admin Server（Config Server + Discovery Server に依存）
 
-## 🔐 Kong Gateway Configuration
+## 🔐 Kong Gateway 設定
 
-### Ingress Resources
+### Ingress リソース
 
-Kong routes are configured using Kubernetes Ingress resources:
+Kong ルートは Kubernetes Ingress リソースを使用して設定されます：
 
 ```yaml
 /api/customer/* → customers-service:8081
@@ -294,212 +297,226 @@ Kong routes are configured using Kubernetes Ingress resources:
 /admin/*        → admin-server:9090
 ```
 
-### Plugins
+### プラグイン
 
-The following Kong plugins are configured:
+以下の Kong プラグインが設定されています：
 
-#### Rate Limiting
-- Limit: 100 requests per minute per client
-- Policy: Local (in-memory)
+#### レート制限
+- 制限: クライアントあたり毎分 100 リクエスト
+- ポリシー: ローカル（インメモリ）
 
 #### CORS
-- Origins: `*` (all origins allowed)
-- Methods: GET, POST, PUT, DELETE, PATCH, OPTIONS
-- Credentials: Enabled
+- オリジン: `*`（すべてのオリジンを許可）
+- メソッド: GET、POST、PUT、DELETE、PATCH、OPTIONS
+- 資格情報: 有効
 
 #### Prometheus
-- Exposes metrics at Kong's metrics endpoint
-- Collects request/response metrics for all services
+- Kong のメトリクスエンドポイントでメトリクスを公開
+- すべてのサービスのリクエスト/レスポンスメトリクスを収集
 
 ### Kong Admin API
 
-Access Kong Admin API at `http://localhost:32001`:
+`http://localhost:32001` で Kong Admin API にアクセス：
 
 ```bash
-# Check Kong status
+# Kong ステータスを確認
 curl http://localhost:32001/status
 
-# List all services
+# すべてのサービスを一覧表示
 curl http://localhost:32001/services
 
-# List all routes
+# すべてのルートを一覧表示
 curl http://localhost:32001/routes
 
-# View metrics
+# メトリクスを表示
 curl http://localhost:32001/metrics
 ```
 
-## 📊 Monitoring and Observability
+## 📊 監視と可観測性
 
 ### Spring Boot Admin
 
-Access the Spring Boot Admin dashboard:
+Spring Boot Admin ダッシュボードにアクセス：
 
 ```bash
-# Through Kong Gateway
+# Kong Gateway 経由
 http://localhost:32000/admin
 
-# Direct access (within cluster)
+# 直接アクセス（クラスター内）
 http://admin-server.petclinic.svc.cluster.local:9090
 ```
 
-### Eureka Dashboard
+### Eureka ダッシュボード
 
-View registered services in Eureka:
+Eureka で登録されたサービスを表示：
 
 ```bash
-# Port-forward to access Eureka UI
+# Eureka UI にアクセスするためのポートフォワード
 kubectl port-forward -n petclinic svc/discovery-server 8761:8761
 
-# Open in browser
+# ブラウザで開く
 http://localhost:8761
 ```
 
-### Kong Metrics
+### Kong メトリクス
 
-Kong exposes Prometheus metrics:
+Kong は Prometheus メトリクスを公開します：
 
 ```bash
-# Access metrics endpoint
+# メトリクスエンドポイントにアクセス
 curl http://localhost:32001/metrics
 ```
 
-### Service Logs
+### サービスログ
 
 ```bash
-# View logs for a specific service
+# 特定のサービスのログを表示
 kubectl logs -f deployment/customers-service -n petclinic
 
-# View Kong logs
+# Kong のログを表示
 kubectl logs -f deployment/kong-controller -n kong
 
-# View all logs in namespace
+# namespace 内のすべてのログを表示
 kubectl logs -f -n petclinic --all-containers=true
 ```
 
-## 🔍 Troubleshooting
+## 🔍 トラブルシューティング
 
-### Services Not Starting
+### サービスが起動しない
 
 ```bash
-# Check pod status
+# Pod のステータスを確認
 kubectl get pods -n petclinic
 
-# Describe problematic pod
+# 問題のある Pod を詳しく確認
 kubectl describe pod <pod-name> -n petclinic
 
-# Check logs
+# ログを確認
 kubectl logs <pod-name> -n petclinic
 ```
 
-### Config Server Issues
+### Config Server の問題
 
 ```bash
-# Check Config Server logs
+# Config Server のログを確認
 kubectl logs deployment/config-server -n petclinic
 
-# Verify Config Server is accessible
+# Config Server にアクセス可能か確認
 kubectl exec -it deployment/customers-service -n petclinic -- \
   curl http://config-server:8888/actuator/health
 ```
 
-### Discovery Server Issues
+### Discovery Server の問題
 
 ```bash
-# Check Eureka logs
+# Eureka のログを確認
 kubectl logs deployment/discovery-server -n petclinic
 
-# Port-forward and check UI
+# ポートフォワードして UI を確認
 kubectl port-forward -n petclinic svc/discovery-server 8761:8761
-# Open http://localhost:8761
+# http://localhost:8761 を開く
 ```
 
-### Kong Gateway Issues
+### Kong Gateway の問題
 
 ```bash
-# Check Kong pod status
+# Kong Pod のステータスを確認
 kubectl get pods -n kong
 
-# Check Kong logs
+# Kong のログを確認
 kubectl logs -f deployment/kong-controller -n kong
 
-# Verify Kong configuration
+# Kong の設定を確認
 kubectl get ingress -n petclinic
 kubectl get kongplugin -n petclinic
 ```
 
-### Network Connectivity
+### ネットワーク接続
 
 ```bash
-# Test service-to-service communication
+# サービス間通信をテスト
 kubectl exec -it deployment/customers-service -n petclinic -- \
   curl http://discovery-server:8761/actuator/health
 
-# Test Kong to backend service
+# Kong からバックエンドサービスへのテスト
 kubectl exec -it -n kong deployment/kong-gateway -- \
   curl http://customers-service.petclinic.svc.cluster.local:8081/actuator/health
 ```
 
-### Common Issues
+### よくある問題
 
-1. **Pods in CrashLoopBackOff**
-   - Check if dependent services (Config/Discovery) are ready
-   - Verify resource limits are not exceeded
-   - Check application logs
+1. **Pod が CrashLoopBackOff 状態**
+   - 依存サービス（Config/Discovery）が準備完了しているか確認
+   - リソース制限を超えていないか確認
+   - アプリケーションログを確認
 
-2. **503 Service Unavailable from Kong**
-   - Verify backend services are running
-   - Check Ingress configuration
-   - Ensure services are registered in Eureka
+2. **Kong から 503 Service Unavailable**
+   - バックエンドサービスが実行中か確認
+   - Ingress 設定を確認
+   - サービスが Eureka に登録されているか確認
 
-3. **Slow Startup**
-   - Services may take 2-3 minutes to fully start
-   - Wait for readiness probes to pass
-   - Check resource constraints
+3. **起動が遅い**
+   - サービスの完全起動には 2〜3 分かかる場合があります
+   - Readiness Probe が通過するまで待機
+   - リソース制約を確認
 
-## 🧹 Cleanup
+## 🧹 クリーンアップ
 
-To remove all deployed resources:
+すべてのデプロイされたリソースを削除するには：
 
 ```bash
-# Run cleanup script
+# クリーンアップスクリプトを実行
 ./scripts/cleanup.sh
 
-# Or manually delete namespaces
+# または手動で namespace を削除
 kubectl delete namespace petclinic
 kubectl delete namespace kong
 ```
 
-## 📚 Additional Resources
+## 📚 追加リソース
 
 - [Spring PetClinic Microservices](https://github.com/spring-petclinic/spring-petclinic-microservices)
-- [Kong Gateway Documentation](https://docs.konghq.com/)
+- [Kong Gateway ドキュメント](https://docs.konghq.com/)
 - [Kong Ingress Controller](https://docs.konghq.com/kubernetes-ingress-controller/)
-- [Spring Cloud Documentation](https://spring.io/projects/spring-cloud)
+- [Spring Cloud ドキュメント](https://spring.io/projects/spring-cloud)
 
-## 🤝 Contributing
+## 🤝 コントリビューション
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+コントリビューションを歓迎します！遠慮なく Pull Request を提出してください。
 
-## 📄 License
+## 📄 ライセンス
 
-This project is based on Spring PetClinic, which is licensed under the Apache License 2.0.
+このプロジェクトは Apache License 2.0 でライセンスされている Spring PetClinic をベースにしています。
 
-## 👥 Authors
+## 👥 作者
 
-- Based on [Spring PetClinic Microservices](https://github.com/spring-petclinic/spring-petclinic-microservices)
-- Kong integration and Kubernetes deployment configurations
+- [Spring PetClinic Microservices](https://github.com/spring-petclinic/spring-petclinic-microservices) をベースにしています
+- Kong 統合と Kubernetes デプロイ設定は **Cursor AI** によって生成されました
+
+## 🤖 AI 生成コードについて
+
+このプロジェクトのすべてのコード、設定ファイル、デプロイメントスクリプトは **Cursor AI** によって自動生成されています。
+
+### 含まれるもの
+- Kubernetes マニフェスト（すべてのサービス）
+- Kong Gateway Helm 設定
+- デプロイメント自動化スクリプト
+- ドキュメント
+
+### 注意事項
+- ⚠️ AI 生成コードには予期しないバグや設定ミスが含まれる可能性があります
+- ⚠️ 本番環境で使用する前に、すべての設定を慎重に検証してください
+- ⚠️ セキュリティ設定、リソース制限、ネットワークポリシーを本番環境に合わせて調整してください
+- ⚠️ このプロジェクトはデモンストレーションと学習目的で提供されています
 
 ---
 
-**Note**: This is a demonstration project. For production use, consider:
-- Adding authentication and authorization
-- Implementing proper secrets management
-- Configuring TLS/SSL certificates
-- Setting up automated backups
-- Implementing proper monitoring and alerting
-- Using persistent storage for stateful services
-<<<<<<< HEAD
-
-=======
->>>>>>> 6352f2a3100c0f5bc96b561c900b7d04c5b97780
+**注意**: これはデモンストレーションプロジェクトです。本番環境で使用する場合は、以下を検討してください：
+- 認証と認可の追加
+- 適切なシークレット管理の実装
+- TLS/SSL 証明書の設定
+- 自動バックアップの設定
+- 適切な監視とアラートの実装
+- ステートフルサービス用の永続ストレージの使用
+- セキュリティスキャンとコンプライアンスチェック
+- リソース制限の調整とパフォーマンステスト
