@@ -12,8 +12,9 @@ gateway:
     # Database mode - using DB-less (declarative) configuration
     database: "off"
     
-    # Declarative configuration file
-    declarative_config: /kong_dbless/kong.yml
+    # Declarative configuration file - not needed when using Ingress Controller
+    # Kong Ingress Controller will dynamically manage the configuration
+    # declarative_config: /kong_dbless/kong.yml
     
     # Proxy settings
     proxy_listen: 0.0.0.0:8000, 0.0.0.0:8443 ssl
