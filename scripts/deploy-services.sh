@@ -124,7 +124,13 @@ kubectl apply -f k8s/admin-server/
 wait_for_deployment petclinic admin-server 300
 echo ""
 
-# Step 6: Display deployment status
+# Step 6: Deploy Frontend (Web UI)
+print_message "$YELLOW" "Step 6: Deploying Frontend (Web UI)..."
+kubectl apply -f k8s/frontend/
+wait_for_deployment petclinic frontend 300
+echo ""
+
+# Step 7: Display deployment status
 print_message "$GREEN" "============================================"
 print_message "$GREEN" "Deployment Summary"
 print_message "$GREEN" "============================================"
@@ -152,6 +158,7 @@ echo ""
 print_message "$BLUE" "Service Endpoints (within cluster):"
 echo "- Config Server: http://config-server.petclinic.svc.cluster.local:8888"
 echo "- Discovery Server: http://discovery-server.petclinic.svc.cluster.local:8761"
+echo "- Frontend (Web UI): http://frontend.petclinic.svc.cluster.local:8080"
 echo "- Customers Service: http://customers-service.petclinic.svc.cluster.local:8081"
 echo "- Visits Service: http://visits-service.petclinic.svc.cluster.local:8082"
 echo "- Vets Service: http://vets-service.petclinic.svc.cluster.local:8083"

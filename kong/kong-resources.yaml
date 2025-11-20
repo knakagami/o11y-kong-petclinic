@@ -9,7 +9,7 @@ metadata:
   name: customers-ingress
   namespace: petclinic
   annotations:
-    konghq.com/strip-path: "false"
+    konghq.com/strip-path: "true"
     kubernetes.io/ingress.class: kong
 spec:
   ingressClassName: kong
@@ -32,7 +32,7 @@ metadata:
   name: visits-ingress
   namespace: petclinic
   annotations:
-    konghq.com/strip-path: "false"
+    konghq.com/strip-path: "true"
     kubernetes.io/ingress.class: kong
 spec:
   ingressClassName: kong
@@ -55,7 +55,7 @@ metadata:
   name: vets-ingress
   namespace: petclinic
   annotations:
-    konghq.com/strip-path: "false"
+    konghq.com/strip-path: "true"
     kubernetes.io/ingress.class: kong
 spec:
   ingressClassName: kong
@@ -78,7 +78,7 @@ metadata:
   name: genai-ingress
   namespace: petclinic
   annotations:
-    konghq.com/strip-path: "false"
+    konghq.com/strip-path: "true"
     kubernetes.io/ingress.class: kong
 spec:
   ingressClassName: kong
@@ -101,7 +101,7 @@ metadata:
   name: admin-ingress
   namespace: petclinic
   annotations:
-    konghq.com/strip-path: "false"
+    konghq.com/strip-path: "true"
     kubernetes.io/ingress.class: kong
 spec:
   ingressClassName: kong
@@ -177,7 +177,7 @@ metadata:
   name: genai-python-ingress
   namespace: petclinic
   annotations:
-    konghq.com/strip-path: "false"
+    konghq.com/strip-path: "true"
     kubernetes.io/ingress.class: kong
 spec:
   ingressClassName: kong
@@ -217,4 +217,30 @@ config:
   credentials: true
   max_age: 3600
 plugin: cors
+
+---
+# Ingress for Frontend (Angular SPA)
+# This serves the web UI at the root path
+# Note: This has lower priority than /api/* routes to avoid conflicts
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: frontend-ingress
+  namespace: petclinic
+  annotations:
+    konghq.com/strip-path: "false"
+    kubernetes.io/ingress.class: kong
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      # Root path for the web UI
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend
+            port:
+              number: 8080
 

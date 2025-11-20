@@ -1,0 +1,96 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-config
+  namespace: petclinic
+  labels:
+    app: frontend
+data:
+  application.yml: |
+    server:
+      port: 8080
+      compression:
+        enabled: true
+        mime-types: application/json,application/xml,text/html,text/xml,text/plain,application/javascript,text/css
+
+    spring:
+      application:
+        name: frontend
+      config:
+        import: optional:configserver:${CONFIG_SERVER_URL:http://config-server:8888}
+      cloud:
+        gateway:
+          # フロントエンド専用設定: バックエンドAPIルーティングは全てKong Gatewayに転送
+          routes:
+            # Customers API - Kong経由
+            - id: customers-service
+              uri: http://kong-gateway-proxy.kong.svc.cluster.local:8000
+              predicates:
+                - Path=/api/customer/**
+              filters:
+                - StripPrefix=0
+            
+            # Visits API - Kong経由
+            - id: visits-service
+              uri: http://kong-gateway-proxy.kong.svc.cluster.local:8000
+              predicates:
+                - Path=/api/visit/**
+              filters:
+                - StripPrefix=0
+            
+            # Vets API - Kong経由
+            - id: vets-service
+              uri: http://kong-gateway-proxy.kong.svc.cluster.local:8000
+              predicates:
+                - Path=/api/vet/**
+              filters:
+                - StripPrefix=0
+            
+            # GenAI API (Java) - Kong経由
+            - id: genai-service
+              uri: http://kong-gateway-proxy.kong.svc.cluster.local:8000
+              predicates:
+                - Path=/api/genai/**
+              filters:
+                - StripPrefix=0
+            
+            # GenAI Python API - Kong経由
+            - id: genai-python
+              uri: http://kong-gateway-proxy.kong.svc.cluster.local:8000
+              predicates:
+                - Path=/api/genai-python/**
+              filters:
+                - StripPrefix=0
+
+      # Eureka クライアント設定（最小限）
+      cloud:
+        discovery:
+          enabled: false
+
+    eureka:
+      client:
+        enabled: true
+        serviceUrl:
+          defaultZone: ${EUREKA_SERVER_URL:http://discovery-server:8761/eureka}
+        registryFetchIntervalSeconds: 5
+        registerWithEureka: true
+        fetchRegistry: true
+      instance:
+        preferIpAddress: true
+        lease-renewal-interval-in-seconds: 5
+
+    management:
+      endpoints:
+        web:
+          exposure:
+            include: '*'
+      endpoint:
+        health:
+          show-details: always
+
+    logging:
+      level:
+        root: INFO
+        org.springframework.cloud.gateway: INFO
+        org.springframework.web: INFO
+

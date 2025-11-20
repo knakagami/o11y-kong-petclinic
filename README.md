@@ -82,7 +82,19 @@ env:
   value: "false"
 ```
 
-### 4. Kubernetes最適化
+### 4. Web UIの追加 🖥️
+
+**新規追加:**
+- 元のAngular製SPAをフロントエンド専用としてデプロイ
+- Kong Gateway経由でWeb UIにアクセス可能
+- バックエンドAPIは全てKong経由で呼び出し
+
+**特徴:**
+- ルートパス `/` でWeb UIを提供
+- ペットオーナー、ペット、獣医師の管理画面
+- 診察記録の登録・閲覧機能
+
+### 5. Kubernetes最適化
 
 **追加機能:**
 - k3s対応のデプロイメント設定
@@ -97,29 +109,41 @@ env:
 このプロジェクトは、従来の Spring Cloud Gateway を Kong API Gateway に置き換え、レート制限、認証、高度なルーティングなどの強化された API 管理機能を提供します。
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                        Kong API Gateway                      │
-│         (NodePort: 30080/30443/30081 → NLB: 30080/30443/30081) │
-└──────────────┬──────────────┬──────────────┬────────────────┘
-               │              │              │
-       ┌───────▼──────┐ ┌────▼─────┐ ┌─────▼──────┐
-       │  Customers   │ │  Visits  │ │    Vets    │
-       │   Service    │ │  Service │ │  Service   │
-       │   (8081)     │ │  (8082)  │ │   (8083)   │
-       └──────┬───────┘ └────┬─────┘ └─────┬──────┘
-              │              │              │
-              └──────────────┼──────────────┘
-                             │
-                    ┌────────▼─────────┐
-                    │ Discovery Server │
-                    │    (Eureka)      │
-                    │     (8761)       │
-                    └────────┬─────────┘
-                             │
-                    ┌────────▼─────────┐
-                    │  Config Server   │
-                    │     (8888)       │
-                    └──────────────────┘
+                            ┌─────────────┐
+                            │   Browser   │
+                            └──────┬──────┘
+                                   │
+                ┌──────────────────▼──────────────────────┐
+                │         Kong API Gateway                │
+                │  (NodePort: 30080/30443/30081           │
+                │   → NLB: 30080/30443/30081)             │
+                └──┬────────┬──────────┬──────────┬───────┘
+                   │        │          │          │
+          ┌────────▼───┐    │          │          │
+          │  Frontend  │    │          │          │
+          │ (Web UI)   │    │          │          │
+          │ Angular SPA│    │          │          │
+          │   (8080)   │    │          │          │
+          └────────────┘    │          │          │
+                            │          │          │
+               ┌────────────▼──┐ ┌────▼─────┐ ┌──▼───────┐
+               │   Customers   │ │  Visits  │ │   Vets   │
+               │    Service    │ │  Service │ │  Service │
+               │    (8081)     │ │  (8082)  │ │  (8083)  │
+               └───────┬───────┘ └────┬─────┘ └─────┬────┘
+                       │              │             │
+                       └──────────────┼─────────────┘
+                                      │
+                             ┌────────▼─────────┐
+                             │ Discovery Server │
+                             │    (Eureka)      │
+                             │     (8761)       │
+                             └────────┬─────────┘
+                                      │
+                             ┌────────▼─────────┐
+                             │  Config Server   │
+                             │     (8888)       │
+                             └──────────────────┘
 ```
 
 ### コンポーネント
@@ -128,6 +152,12 @@ env:
 - **Config Server** (8888): 集中設定管理
 - **Discovery Server** (8761): サービスディスカバリー用の Eureka サービスレジストリ
 - **Admin Server** (9090): 監視用の Spring Boot Admin
+
+#### フロントエンド
+- **Frontend (Web UI)** (8080): Angular製のWeb UI（SPA） ✨ **NEW**
+  - ブラウザからアクセス可能なWebインターフェース
+  - バックエンドAPIはKong経由で呼び出し
+  - ペットオーナー、ペット、獣医師、診察記録の管理画面
 
 #### ビジネスサービス
 - **Customers Service** (8081): ペットオーナーとペットの管理
@@ -219,6 +249,7 @@ chmod +x scripts/*.sh
 3. Discovery Server (Eureka) のデプロイ
 4. すべてのビジネスサービスを並行デプロイ
 5. Admin Server のデプロイ
+6. Frontend (Web UI) のデプロイ
 
 ### 3. Kong API Gateway のデプロイ
 
@@ -249,7 +280,23 @@ kubectl get pods -n kong
 kubectl get ingress -n petclinic
 ```
 
-## 🌐 API エンドポイント
+## 🌐 Web UI & API エンドポイント
+
+### 🖥️ Web UI（ブラウザからアクセス）
+
+Spring PetClinicのAngular製Web UIにブラウザからアクセスできます：
+
+```
+http://<NLB-DNS>:30080/
+または
+http://<k3s-node-ip>:30080/
+```
+
+**Web UIの機能:**
+- ペットオーナーの登録・検索・編集
+- ペット情報の管理
+- 獣医師の一覧表示
+- 診察記録の登録・閲覧
 
 ### Kong Gateway 経由（NodePort + AWS NLB）
 
@@ -582,12 +629,16 @@ curl http://localhost:30081/status
 Kong ルートは Kubernetes Ingress リソースを使用して設定されます：
 
 ```yaml
-/api/customer/* → customers-service:8081
-/api/visit/*    → visits-service:8082
-/api/vet/*      → vets-service:8083
-/api/genai/*    → genai-service:8084
-/admin/*        → admin-server:9090
+/                   → frontend:8080 (Web UI - Angular SPA)
+/api/customer/*     → customers-service:8081
+/api/visit/*        → visits-service:8082
+/api/vet/*          → vets-service:8083
+/api/genai/*        → genai-service:8084
+/api/genai-python/* → genai-python:8085
+/admin/*            → admin-server:9090
 ```
+
+> **注意:** `/` (ルートパス) はWeb UIを提供し、`/api/*` パスは各バックエンドサービスにルーティングされます。
 
 ### プラグイン
 
