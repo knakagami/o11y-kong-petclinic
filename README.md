@@ -483,70 +483,94 @@ resources:
 
 ## 🔐 Kong Gateway 設定
 
-### LoadBalancer エンドポイント
+### NodePort + NLB構成
 
-Kong Gateway は AWS NLB (Network Load Balancer) を使用して公開されています：
+Kong Gateway は Kubernetes NodePort を使用し、AWS NLB 経由で公開されています：
 
-| サービス | ポート | 用途 |
-|---------|--------|------|
-| Proxy (HTTP) | 10080 | メインAPIエンドポイント |
-| Proxy (HTTPS) | 10443 | HTTPS APIエンドポイント（オプション） |
-| Admin API | 10081 | Kong管理API |
+| 層 | HTTP | HTTPS | Admin |
+|----|------|-------|-------|
+| **外部アクセス（NLB）** | 10080 | 10443 | 10081 |
+| **NodePort（k3s）** | 30080 | 30443 | 30081 |
+| **Kong内部** | 8000 | 8443 | 8001 |
 
 **アクセス方法:**
 ```bash
-# NLB経由（外部から）
+# NLB経由（外部から）- 推奨
 curl http://<NLB-DNS>:10080/api/vet/vets
 
-# ローカル（k3sノード上から）
-curl http://localhost:10080/api/vet/vets
+# NodePort経由（k3sノード上から）
+curl http://localhost:30080/api/vet/vets
 
-# Admin API
-curl http://localhost:10081/status
+# Admin API（NLB経由）
+curl http://<NLB-DNS>:10081/status
+
+# Admin API（NodePort経由）
+curl http://localhost:30081/status
 ```
 
 ### AWS NLB設定ガイド
 
-#### 必要なNLBリスナー設定
+#### 必要なNLBリスナーとターゲットグループ設定
 
-NLBで以下のリスナーを設定してください：
+**重要**: NLBのリスナーポートとターゲットグループのポートが異なります！
 
-1. **HTTPプロキシリスナー**
+| リスナー（外部） | ターゲットグループ（EC2） | 説明 |
+|----------------|------------------------|------|
+| TCP 10080 | 30080 | HTTPプロキシ |
+| TCP 10443 | 30443 | HTTPSプロキシ（オプション） |
+| TCP 10081 | 30081 | Admin API |
+
+#### 設定手順
+
+1. **ターゲットグループを作成（3つ）**
+
+   **HTTPプロキシ用:**
    - プロトコル: TCP
-   - ポート: 10080
-   - ターゲットグループ: EC2インスタンス（k3sノード）
-   - ヘルスチェック: TCP 10080
+   - ポート: **30080** ← NodePort
+   - ターゲット: EC2インスタンス（k3sノード）
+   - ヘルスチェック: TCP 30080
 
-2. **HTTPSプロキシリスナー（オプション）**
+   **HTTPSプロキシ用（オプション）:**
    - プロトコル: TCP
-   - ポート: 10443
-   - ターゲットグループ: EC2インスタンス（k3sノード）
-   - ヘルスチェック: TCP 10443
+   - ポート: **30443** ← NodePort
+   - ターゲット: EC2インスタンス（k3sノード）
+   - ヘルスチェック: TCP 30443
 
-3. **Admin APIリスナー**
+   **Admin API用:**
    - プロトコル: TCP
-   - ポート: 10081
-   - ターゲットグループ: EC2インスタンス（k3sノード）
-   - ヘルスチェック: TCP 10081
+   - ポート: **30081** ← NodePort
+   - ターゲット: EC2インスタンス（k3sノード）
+   - ヘルスチェック: TCP 30081
+
+2. **NLBリスナーを作成**
+   - リスナー1: ポート 10080 → HTTPプロキシ用ターゲットグループ
+   - リスナー2: ポート 10443 → HTTPSプロキシ用ターゲットグループ
+   - リスナー3: ポート 10081 → Admin API用ターゲットグループ
 
 #### セキュリティグループ設定
 
 EC2インスタンスのセキュリティグループで以下のポートを開放：
 ```
 インバウンドルール:
-- TCP 10080 (NLBから)
-- TCP 10443 (NLBから) - オプション
-- TCP 10081 (NLBから) - 管理用
+- TCP 30080 (NLBから) - HTTP Proxy
+- TCP 30443 (NLBから) - HTTPS Proxy (オプション)
+- TCP 30081 (NLBから) - Admin API
 ```
 
 #### 確認手順
 
 ```bash
-# NLBのDNS名を取得
-kubectl get svc -n kong kong-gateway-proxy -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
-
-# LoadBalancerが正しく作成されたか確認
+# Kong ServiceがNodePortで動作しているか確認
 kubectl get svc -n kong
+
+# 期待される出力:
+# NAME                  TYPE       CLUSTER-IP      EXTERNAL-IP   PORT(S)
+# kong-gateway-proxy    NodePort   10.x.x.x        <none>        8000:30080/TCP,8443:30443/TCP
+# kong-gateway-admin    NodePort   10.x.x.x        <none>        8001:30081/TCP
+
+# NodePort経由でローカルからアクセスできるか確認
+curl http://localhost:30080
+curl http://localhost:30081/status
 ```
 
 ### Ingress リソース
