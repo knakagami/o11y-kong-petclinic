@@ -61,9 +61,6 @@ data:
                 - Path=/api/genai-python/**
               filters:
                 - StripPrefix=0
-
-      # Eureka クライアント設定（最小限）
-      cloud:
         discovery:
           enabled: false
 
