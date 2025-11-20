@@ -99,7 +99,7 @@ env:
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                        Kong API Gateway                      │
-│         (NodePort: 30080/30443/30081 → NLB: 10080/10443/10081) │
+│         (NodePort: 30080/30443/30081 → NLB: 30080/30443/30081) │
 └──────────────┬──────────────┬──────────────┬────────────────┘
                │              │              │
        ┌───────▼──────┐ ┌────▼─────┐ ┌─────▼──────┐
@@ -254,24 +254,24 @@ kubectl get ingress -n petclinic
 ### Kong Gateway 経由（NodePort + AWS NLB）
 
 すべての API は Kong Gateway 経由でアクセス可能です：
-- **AWS NLB経由**: `http://<NLB-DNS>:10080` (NLB → k3s NodePort 30080)
+- **AWS NLB経由**: `http://<NLB-DNS>:30080` (NLB → k3s NodePort 30080)
 - **ローカル（k3sノード上）**: `http://localhost:30080` または `http://<k3s-node-ip>:30080`
 
 > **注意:** Kong Gatewayは`NodePort`サービスとして動作し、AWS NLBが外部からのリクエストを受け付けます。
-> - 外部アクセス: NLBのポート10080/10443/10081を使用
-> - 内部アクセス: k3sノードのNodePort 30080/30443/30081を使用
+> - 外部アクセス: NLBのポート30080/30443/30081を使用
+> - 内部アクセス: k3sノードのNodePort 30080/30443/30081を使用（同じポート番号）
 
 #### Customers Service
 
 ```bash
 # すべての顧客を一覧表示
-GET http://localhost:10080/api/customer/owners
+GET http://localhost:30080/api/customer/owners
 
 # ID で顧客を取得
-GET http://localhost:10080/api/customer/owners/{ownerId}
+GET http://localhost:30080/api/customer/owners/{ownerId}
 
 # 新しい顧客を作成
-POST http://localhost:10080/api/customer/owners
+POST http://localhost:30080/api/customer/owners
 Content-Type: application/json
 {
   "firstName": "太郎",
@@ -282,20 +282,20 @@ Content-Type: application/json
 }
 
 # 姓で顧客を検索
-GET http://localhost:10080/api/customer/owners/*/lastname/{lastName}
+GET http://localhost:30080/api/customer/owners/*/lastname/{lastName}
 
 # ペットタイプを取得
-GET http://localhost:10080/api/customer/petTypes
+GET http://localhost:30080/api/customer/petTypes
 ```
 
 #### Visits Service
 
 ```bash
 # ペットの診察記録を取得
-GET http://localhost:10080/api/visit/owners/*/pets/{petId}/visits
+GET http://localhost:30080/api/visit/owners/*/pets/{petId}/visits
 
 # 新しい診察記録を作成
-POST http://localhost:10080/api/visit/owners/*/pets/{petId}/visits
+POST http://localhost:30080/api/visit/owners/*/pets/{petId}/visits
 Content-Type: application/json
 {
   "date": "2024-01-15",
@@ -307,14 +307,14 @@ Content-Type: application/json
 
 ```bash
 # すべての獣医師を一覧表示
-GET http://localhost:10080/api/vet/vets
+GET http://localhost:30080/api/vet/vets
 ```
 
 #### GenAI Service（Java版）
 
 ```bash
 # チャットボットAPI
-POST http://localhost:10080/api/genai/chatclient
+POST http://localhost:30080/api/genai/chatclient
 Content-Type: text/plain
 
 飼い主を全員教えてください
@@ -324,39 +324,39 @@ Content-Type: text/plain
 
 ```bash
 # チャットボットAPI（Python版）
-POST http://localhost:10080/api/genai-python/chatclient
+POST http://localhost:30080/api/genai-python/chatclient
 Content-Type: text/plain
 
 獣医師を全員教えてください
 
 # サービス情報
-GET http://localhost:10080/api/genai-python/info
+GET http://localhost:30080/api/genai-python/info
 
 # ヘルスチェック
-GET http://localhost:10080/api/genai-python/health
+GET http://localhost:30080/api/genai-python/health
 ```
 
 #### Admin Server
 
 ```bash
 # Spring Boot Admin UI にアクセス
-GET http://localhost:10080/admin
+GET http://localhost:30080/admin
 ```
 
 ### curl コマンド例
 
 ```bash
 # すべての獣医師を取得
-curl http://localhost:10080/api/vet/vets
+curl http://localhost:30080/api/vet/vets
 
 # すべてのペットタイプを取得
-curl http://localhost:10080/api/customer/petTypes
+curl http://localhost:30080/api/customer/petTypes
 
 # すべてのオーナーを取得
-curl http://localhost:10080/api/customer/owners
+curl http://localhost:30080/api/customer/owners
 
 # 新しいオーナーを作成
-curl -X POST http://localhost:10080/api/customer/owners \
+curl -X POST http://localhost:30080/api/customer/owners \
   -H "Content-Type: application/json" \
   -d '{
     "firstName": "花子",
@@ -427,7 +427,7 @@ kubectl get pods -n petclinic -l app=genai-python
 kubectl logs -f deployment/genai-python -n petclinic
 
 # Kong経由でテスト
-curl -X POST http://localhost:10080/api/genai-python/chatclient \
+curl -X POST http://localhost:30080/api/genai-python/chatclient \
   -H "Content-Type: text/plain" \
   -d "飼い主を全員教えてください"
 ```
@@ -493,20 +493,20 @@ Kong Gateway は Kubernetes NodePort を使用し、AWS NLB 経由で公開さ�
 
 | 層 | HTTP | HTTPS | Admin |
 |----|------|-------|-------|
-| **外部アクセス（NLB）** | 10080 | 10443 | 10081 |
+| **外部アクセス（NLB）** | 30080 | 30443 | 30081 |
 | **NodePort（k3s）** | 30080 | 30443 | 30081 |
 | **Kong内部** | 8000 | 8443 | 8001 |
 
 **アクセス方法:**
 ```bash
 # NLB経由（外部から）- 推奨
-curl http://<NLB-DNS>:10080/api/vet/vets
+curl http://<NLB-DNS>:30080/api/vet/vets
 
 # NodePort経由（k3sノード上から）
 curl http://localhost:30080/api/vet/vets
 
 # Admin API（NLB経由）
-curl http://<NLB-DNS>:10081/status
+curl http://<NLB-DNS>:30081/status
 
 # Admin API（NodePort経由）
 curl http://localhost:30081/status
@@ -516,13 +516,13 @@ curl http://localhost:30081/status
 
 #### 必要なNLBリスナーとターゲットグループ設定
 
-**重要**: NLBのリスナーポートとターゲットグループのポートが異なります！
+**注意**: この設定では、NLBのリスナーポートとターゲットグループのポートが同じです。
 
 | リスナー（外部） | ターゲットグループ（EC2） | 説明 |
 |----------------|------------------------|------|
-| TCP 10080 | 30080 | HTTPプロキシ |
-| TCP 10443 | 30443 | HTTPSプロキシ（オプション） |
-| TCP 10081 | 30081 | Admin API |
+| TCP 30080 | 30080 | HTTPプロキシ |
+| TCP 30443 | 30443 | HTTPSプロキシ（オプション） |
+| TCP 30081 | 30081 | Admin API |
 
 #### 設定手順
 
@@ -547,9 +547,9 @@ curl http://localhost:30081/status
    - ヘルスチェック: TCP 30081
 
 2. **NLBリスナーを作成**
-   - リスナー1: ポート 10080 → HTTPプロキシ用ターゲットグループ
-   - リスナー2: ポート 10443 → HTTPSプロキシ用ターゲットグループ
-   - リスナー3: ポート 10081 → Admin API用ターゲットグループ
+   - リスナー1: ポート 30080 → HTTPプロキシ用ターゲットグループ
+   - リスナー2: ポート 30443 → HTTPSプロキシ用ターゲットグループ
+   - リスナー3: ポート 30081 → Admin API用ターゲットグループ
 
 #### セキュリティグループ設定
 
@@ -608,20 +608,20 @@ Kong ルートは Kubernetes Ingress リソースを使用して設定されま�
 
 ### Kong Admin API
 
-`http://localhost:10081` で Kong Admin API にアクセス：
+`http://localhost:30081` で Kong Admin API にアクセス：
 
 ```bash
 # Kong ステータスを確認
-curl http://localhost:10081/status
+curl http://localhost:30081/status
 
 # すべてのサービスを一覧表示
-curl http://localhost:10081/services
+curl http://localhost:30081/services
 
 # すべてのルートを一覧表示
-curl http://localhost:10081/routes
+curl http://localhost:30081/routes
 
 # メトリクスを表示
-curl http://localhost:10081/metrics
+curl http://localhost:30081/metrics
 ```
 
 ## 📊 監視と可観測性
@@ -632,7 +632,7 @@ Spring Boot Admin ダッシュボードにアクセス：
 
 ```bash
 # Kong Gateway 経由
-http://localhost:10080/admin
+http://localhost:30080/admin
 
 # 直接アクセス（クラスター内）
 http://admin-server.petclinic.svc.cluster.local:9090
@@ -656,7 +656,7 @@ Kong は Prometheus メトリクスを公開します：
 
 ```bash
 # メトリクスエンドポイントにアクセス
-curl http://localhost:10081/metrics
+curl http://localhost:30081/metrics
 ```
 
 ### サービスログ
