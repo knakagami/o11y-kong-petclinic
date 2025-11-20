@@ -59,7 +59,7 @@ echo ""
 
 # Wait for Kong to be ready
 print_message "$YELLOW" "Waiting for Kong pods to be ready..."
-kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=ingress-kong -n kong --timeout=300s
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/instance=kong -n kong --timeout=300s
 print_message "$GREEN" "✓ Kong pods are ready"
 echo ""
 
@@ -92,8 +92,8 @@ kubectl get kongplugin -n petclinic 2>/dev/null || echo "No Kong plugins found"
 echo ""
 
 # Get Kong Service details
-PROXY_SERVICE=$(kubectl get svc -n kong -l app.kubernetes.io/name=ingress-kong,app.kubernetes.io/component=app -o jsonpath='{.items[0].metadata.name}')
-ADMIN_SERVICE=$(kubectl get svc -n kong -l app.kubernetes.io/name=ingress-kong,app.kubernetes.io/component=app -o jsonpath='{.items[1].metadata.name}' 2>/dev/null || echo "")
+PROXY_SERVICE=$(kubectl get svc -n kong -l app.kubernetes.io/name=gateway -o jsonpath='{.items[?(@.metadata.name=="kong-gateway-proxy")].metadata.name}')
+ADMIN_SERVICE=$(kubectl get svc -n kong -l app.kubernetes.io/name=gateway -o jsonpath='{.items[?(@.metadata.name=="kong-gateway-admin")].metadata.name}')
 
 # Get service type
 SERVICE_TYPE=$(kubectl get svc $PROXY_SERVICE -n kong -o jsonpath='{.spec.type}')
@@ -112,7 +112,7 @@ else
     # NodePort mode - get nodePort
     PROXY_HTTP_PORT=$(kubectl get svc $PROXY_SERVICE -n kong -o jsonpath='{.spec.ports[?(@.name=="kong-proxy")].nodePort}')
     PROXY_HTTPS_PORT=$(kubectl get svc $PROXY_SERVICE -n kong -o jsonpath='{.spec.ports[?(@.name=="kong-proxy-tls")].nodePort}')
-    ADMIN_PORT=$(kubectl get svc -n kong -l app.kubernetes.io/name=ingress-kong,app.kubernetes.io/component=app -o jsonpath='{.items[0].spec.ports[?(@.name=="kong-admin")].nodePort}')
+    ADMIN_PORT=$(kubectl get svc $ADMIN_SERVICE -n kong -o jsonpath='{.spec.ports[?(@.name=="kong-admin")].nodePort}')
     EXTERNAL_ENDPOINT="localhost"
 fi
 
@@ -183,7 +183,8 @@ fi
 echo ""
 
 print_message "$BLUE" "Useful commands:"
-echo "  - View Kong logs: kubectl logs -f deployment/kong-controller -n kong"
+echo "  - View Kong Controller logs: kubectl logs -f deployment/kong-controller -n kong"
+echo "  - View Kong Gateway logs: kubectl logs -f deployment/kong-gateway -n kong"
 echo "  - View Kong config: kubectl get ingress -n petclinic"
 echo "  - Test Kong Admin: curl http://localhost:${ADMIN_PORT}/status"
 echo ""
