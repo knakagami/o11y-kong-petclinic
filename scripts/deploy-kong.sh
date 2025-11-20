@@ -91,37 +91,95 @@ print_message "$BLUE" "Kong Plugins:"
 kubectl get kongplugin -n petclinic 2>/dev/null || echo "No Kong plugins found"
 echo ""
 
-# Get Kong Proxy Service details
+# Get Kong Service details
 PROXY_SERVICE=$(kubectl get svc -n kong -l app.kubernetes.io/name=ingress-kong,app.kubernetes.io/component=app -o jsonpath='{.items[0].metadata.name}')
-PROXY_PORT=$(kubectl get svc $PROXY_SERVICE -n kong -o jsonpath='{.spec.ports[?(@.name=="kong-proxy")].nodePort}')
-ADMIN_PORT=$(kubectl get svc -n kong -l app.kubernetes.io/name=ingress-kong,app.kubernetes.io/component=app -o jsonpath='{.items[0].spec.ports[?(@.name=="kong-admin")].nodePort}')
+ADMIN_SERVICE=$(kubectl get svc -n kong -l app.kubernetes.io/name=ingress-kong,app.kubernetes.io/component=app -o jsonpath='{.items[1].metadata.name}' 2>/dev/null || echo "")
+
+# Get service type
+SERVICE_TYPE=$(kubectl get svc $PROXY_SERVICE -n kong -o jsonpath='{.spec.type}')
+
+if [ "$SERVICE_TYPE" == "LoadBalancer" ]; then
+    # LoadBalancer mode - get servicePort and External-IP
+    PROXY_HTTP_PORT=$(kubectl get svc $PROXY_SERVICE -n kong -o jsonpath='{.spec.ports[?(@.name=="kong-proxy")].port}')
+    PROXY_HTTPS_PORT=$(kubectl get svc $PROXY_SERVICE -n kong -o jsonpath='{.spec.ports[?(@.name=="kong-proxy-tls")].port}')
+    ADMIN_PORT=$(kubectl get svc $ADMIN_SERVICE -n kong -o jsonpath='{.spec.ports[?(@.name=="kong-admin")].port}' 2>/dev/null || echo "N/A")
+    
+    # Get LoadBalancer hostname/IP (may take a moment to provision)
+    LB_HOSTNAME=$(kubectl get svc $PROXY_SERVICE -n kong -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+    LB_IP=$(kubectl get svc $PROXY_SERVICE -n kong -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+    EXTERNAL_ENDPOINT=${LB_HOSTNAME:-${LB_IP:-"<pending>"}}
+else
+    # NodePort mode - get nodePort
+    PROXY_HTTP_PORT=$(kubectl get svc $PROXY_SERVICE -n kong -o jsonpath='{.spec.ports[?(@.name=="kong-proxy")].nodePort}')
+    PROXY_HTTPS_PORT=$(kubectl get svc $PROXY_SERVICE -n kong -o jsonpath='{.spec.ports[?(@.name=="kong-proxy-tls")].nodePort}')
+    ADMIN_PORT=$(kubectl get svc -n kong -l app.kubernetes.io/name=ingress-kong,app.kubernetes.io/component=app -o jsonpath='{.items[0].spec.ports[?(@.name=="kong-admin")].nodePort}')
+    EXTERNAL_ENDPOINT="localhost"
+fi
 
 print_message "$GREEN" "============================================"
 print_message "$GREEN" "✓ Kong Gateway deployed successfully!"
 print_message "$GREEN" "============================================"
 echo ""
 
+print_message "$YELLOW" "Kong Service Type: $SERVICE_TYPE"
+echo ""
+
+if [ "$SERVICE_TYPE" == "LoadBalancer" ]; then
+    print_message "$BLUE" "LoadBalancer Information:"
+    echo "  - Proxy Service: $PROXY_SERVICE"
+    echo "  - Admin Service: $ADMIN_SERVICE"
+    echo "  - External Endpoint: $EXTERNAL_ENDPOINT"
+    echo ""
+    
+    if [ "$EXTERNAL_ENDPOINT" == "<pending>" ]; then
+        print_message "$YELLOW" "⚠️  LoadBalancer is being provisioned. Please wait a few moments."
+        print_message "$YELLOW" "    Check status: kubectl get svc -n kong"
+        echo ""
+    fi
+fi
+
 print_message "$YELLOW" "Kong Access Information:"
 echo ""
 print_message "$BLUE" "Kong Proxy (API Gateway):"
-echo "  - HTTP:  http://localhost:${PROXY_PORT}"
-echo "  - HTTPS: https://localhost:32443 (if configured)"
+if [ "$SERVICE_TYPE" == "LoadBalancer" ]; then
+    echo "  - HTTP:  http://${EXTERNAL_ENDPOINT}:${PROXY_HTTP_PORT}"
+    echo "  - HTTPS: https://${EXTERNAL_ENDPOINT}:${PROXY_HTTPS_PORT} (if configured)"
+    echo "  - Local: http://localhost:${PROXY_HTTP_PORT}"
+else
+    echo "  - HTTP:  http://localhost:${PROXY_HTTP_PORT}"
+    echo "  - HTTPS: https://localhost:${PROXY_HTTPS_PORT} (if configured)"
+fi
 echo ""
 print_message "$BLUE" "Kong Admin API:"
 echo "  - HTTP: http://localhost:${ADMIN_PORT}"
 echo ""
 
 print_message "$YELLOW" "API Endpoints (through Kong Gateway):"
-echo "  - Customers API: http://localhost:${PROXY_PORT}/api/customer"
-echo "  - Visits API:    http://localhost:${PROXY_PORT}/api/visit"
-echo "  - Vets API:      http://localhost:${PROXY_PORT}/api/vet"
-echo "  - GenAI API:     http://localhost:${PROXY_PORT}/api/genai"
-echo "  - Admin UI:      http://localhost:${PROXY_PORT}/admin"
+if [ "$SERVICE_TYPE" == "LoadBalancer" ]; then
+    echo "  - Customers API: http://${EXTERNAL_ENDPOINT}:${PROXY_HTTP_PORT}/api/customer"
+    echo "  - Visits API:    http://${EXTERNAL_ENDPOINT}:${PROXY_HTTP_PORT}/api/visit"
+    echo "  - Vets API:      http://${EXTERNAL_ENDPOINT}:${PROXY_HTTP_PORT}/api/vet"
+    echo "  - GenAI API:     http://${EXTERNAL_ENDPOINT}:${PROXY_HTTP_PORT}/api/genai"
+    echo "  - GenAI Python:  http://${EXTERNAL_ENDPOINT}:${PROXY_HTTP_PORT}/api/genai-python"
+    echo "  - Admin UI:      http://${EXTERNAL_ENDPOINT}:${PROXY_HTTP_PORT}/admin"
+else
+    echo "  - Customers API: http://localhost:${PROXY_HTTP_PORT}/api/customer"
+    echo "  - Visits API:    http://localhost:${PROXY_HTTP_PORT}/api/visit"
+    echo "  - Vets API:      http://localhost:${PROXY_HTTP_PORT}/api/vet"
+    echo "  - GenAI API:     http://localhost:${PROXY_HTTP_PORT}/api/genai"
+    echo "  - GenAI Python:  http://localhost:${PROXY_HTTP_PORT}/api/genai-python"
+    echo "  - Admin UI:      http://localhost:${PROXY_HTTP_PORT}/admin"
+fi
 echo ""
 
 print_message "$YELLOW" "Example API calls:"
-echo "  curl http://localhost:${PROXY_PORT}/api/vet/vets"
-echo "  curl http://localhost:${PROXY_PORT}/api/customer/owners"
+if [ "$SERVICE_TYPE" == "LoadBalancer" ]; then
+    echo "  curl http://${EXTERNAL_ENDPOINT}:${PROXY_HTTP_PORT}/api/vet/vets"
+    echo "  curl http://${EXTERNAL_ENDPOINT}:${PROXY_HTTP_PORT}/api/customer/owners"
+else
+    echo "  curl http://localhost:${PROXY_HTTP_PORT}/api/vet/vets"
+    echo "  curl http://localhost:${PROXY_HTTP_PORT}/api/customer/owners"
+fi
 echo ""
 
 print_message "$BLUE" "Useful commands:"

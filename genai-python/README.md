@@ -250,7 +250,7 @@ Kong API Gatewayがデプロイされている場合：
 
 ```bash
 # Kong経由でアクセス
-curl -X POST http://<kong-proxy-ip>:32000/api/genai-python/chatclient \
+curl -X POST http://<kong-proxy-ip>:10080/api/genai-python/chatclient \
   -H "Content-Type: text/plain" \
   -d "Show me all veterinarians"
 ```

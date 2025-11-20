@@ -34,24 +34,28 @@ gateway:
   # Admin API service
   admin:
     enabled: true
-    type: NodePort
+    type: LoadBalancer
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
     http:
       enabled: true
-      servicePort: 8001
-      nodePort: 32001
+      servicePort: 10081
+      containerPort: 8001
     
   # Proxy service - main entry point for API traffic
   proxy:
     enabled: true
-    type: NodePort
+    type: LoadBalancer
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
     http:
       enabled: true
-      servicePort: 8000
-      nodePort: 32000
+      servicePort: 10080
+      containerPort: 8000
     https:
       enabled: true
-      servicePort: 8443
-      nodePort: 32443
+      servicePort: 10443
+      containerPort: 8443
 
 # Ingress Controller configuration
 ingressController:

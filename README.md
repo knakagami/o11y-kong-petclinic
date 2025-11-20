@@ -99,7 +99,7 @@ env:
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                        Kong API Gateway                      │
-│                  (NodePort: 32000/32443)                    │
+│              (LoadBalancer: 10080/10443/10081)              │
 └──────────────┬──────────────┬──────────────┬────────────────┘
                │              │              │
        ┌───────▼──────┐ ┌────▼─────┐ ┌─────▼──────┐
@@ -251,21 +251,23 @@ kubectl get ingress -n petclinic
 
 ## 🌐 API エンドポイント
 
-### Kong Gateway 経由（NodePort: 32000）
+### Kong Gateway 経由（LoadBalancer: ポート 10080）
 
-すべての API は `http://localhost:32000`（またはノードの IP）で Kong Gateway 経由でアクセス可能です。
+すべての API は Kong Gateway 経由でアクセス可能です：
+- **AWS NLB経由**: `http://<NLB-DNS>:10080`
+- **ローカル（k3sノード上）**: `http://localhost:10080`
 
 #### Customers Service
 
 ```bash
 # すべての顧客を一覧表示
-GET http://localhost:32000/api/customer/owners
+GET http://localhost:10080/api/customer/owners
 
 # ID で顧客を取得
-GET http://localhost:32000/api/customer/owners/{ownerId}
+GET http://localhost:10080/api/customer/owners/{ownerId}
 
 # 新しい顧客を作成
-POST http://localhost:32000/api/customer/owners
+POST http://localhost:10080/api/customer/owners
 Content-Type: application/json
 {
   "firstName": "太郎",
@@ -279,17 +281,17 @@ Content-Type: application/json
 GET http://localhost:32000/api/customer/owners/*/lastname/{lastName}
 
 # ペットタイプを取得
-GET http://localhost:32000/api/customer/petTypes
+GET http://localhost:10080/api/customer/petTypes
 ```
 
 #### Visits Service
 
 ```bash
 # ペットの診察記録を取得
-GET http://localhost:32000/api/visit/owners/*/pets/{petId}/visits
+GET http://localhost:10080/api/visit/owners/*/pets/{petId}/visits
 
 # 新しい診察記録を作成
-POST http://localhost:32000/api/visit/owners/*/pets/{petId}/visits
+POST http://localhost:10080/api/visit/owners/*/pets/{petId}/visits
 Content-Type: application/json
 {
   "date": "2024-01-15",
@@ -301,14 +303,14 @@ Content-Type: application/json
 
 ```bash
 # すべての獣医師を一覧表示
-GET http://localhost:32000/api/vet/vets
+GET http://localhost:10080/api/vet/vets
 ```
 
 #### GenAI Service（Java版）
 
 ```bash
 # チャットボットAPI
-POST http://localhost:32000/api/genai/chatclient
+POST http://localhost:10080/api/genai/chatclient
 Content-Type: text/plain
 
 飼い主を全員教えてください
@@ -318,39 +320,39 @@ Content-Type: text/plain
 
 ```bash
 # チャットボットAPI（Python版）
-POST http://localhost:32000/api/genai-python/chatclient
+POST http://localhost:10080/api/genai-python/chatclient
 Content-Type: text/plain
 
 獣医師を全員教えてください
 
 # サービス情報
-GET http://localhost:32000/api/genai-python/info
+GET http://localhost:10080/api/genai-python/info
 
 # ヘルスチェック
-GET http://localhost:32000/api/genai-python/health
+GET http://localhost:10080/api/genai-python/health
 ```
 
 #### Admin Server
 
 ```bash
 # Spring Boot Admin UI にアクセス
-GET http://localhost:32000/admin
+GET http://localhost:10080/admin
 ```
 
 ### curl コマンド例
 
 ```bash
 # すべての獣医師を取得
-curl http://localhost:32000/api/vet/vets
+curl http://localhost:10080/api/vet/vets
 
 # すべてのペットタイプを取得
-curl http://localhost:32000/api/customer/petTypes
+curl http://localhost:10080/api/customer/petTypes
 
 # すべてのオーナーを取得
-curl http://localhost:32000/api/customer/owners
+curl http://localhost:10080/api/customer/owners
 
 # 新しいオーナーを作成
-curl -X POST http://localhost:32000/api/customer/owners \
+curl -X POST http://localhost:10080/api/customer/owners \
   -H "Content-Type: application/json" \
   -d '{
     "firstName": "花子",
@@ -421,7 +423,7 @@ kubectl get pods -n petclinic -l app=genai-python
 kubectl logs -f deployment/genai-python -n petclinic
 
 # Kong経由でテスト
-curl -X POST http://localhost:32000/api/genai-python/chatclient \
+curl -X POST http://localhost:10080/api/genai-python/chatclient \
   -H "Content-Type: text/plain" \
   -d "飼い主を全員教えてください"
 ```
@@ -481,6 +483,72 @@ resources:
 
 ## 🔐 Kong Gateway 設定
 
+### LoadBalancer エンドポイント
+
+Kong Gateway は AWS NLB (Network Load Balancer) を使用して公開されています：
+
+| サービス | ポート | 用途 |
+|---------|--------|------|
+| Proxy (HTTP) | 10080 | メインAPIエンドポイント |
+| Proxy (HTTPS) | 10443 | HTTPS APIエンドポイント（オプション） |
+| Admin API | 10081 | Kong管理API |
+
+**アクセス方法:**
+```bash
+# NLB経由（外部から）
+curl http://<NLB-DNS>:10080/api/vet/vets
+
+# ローカル（k3sノード上から）
+curl http://localhost:10080/api/vet/vets
+
+# Admin API
+curl http://localhost:10081/status
+```
+
+### AWS NLB設定ガイド
+
+#### 必要なNLBリスナー設定
+
+NLBで以下のリスナーを設定してください：
+
+1. **HTTPプロキシリスナー**
+   - プロトコル: TCP
+   - ポート: 10080
+   - ターゲットグループ: EC2インスタンス（k3sノード）
+   - ヘルスチェック: TCP 10080
+
+2. **HTTPSプロキシリスナー（オプション）**
+   - プロトコル: TCP
+   - ポート: 10443
+   - ターゲットグループ: EC2インスタンス（k3sノード）
+   - ヘルスチェック: TCP 10443
+
+3. **Admin APIリスナー**
+   - プロトコル: TCP
+   - ポート: 10081
+   - ターゲットグループ: EC2インスタンス（k3sノード）
+   - ヘルスチェック: TCP 10081
+
+#### セキュリティグループ設定
+
+EC2インスタンスのセキュリティグループで以下のポートを開放：
+```
+インバウンドルール:
+- TCP 10080 (NLBから)
+- TCP 10443 (NLBから) - オプション
+- TCP 10081 (NLBから) - 管理用
+```
+
+#### 確認手順
+
+```bash
+# NLBのDNS名を取得
+kubectl get svc -n kong kong-gateway-proxy -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+
+# LoadBalancerが正しく作成されたか確認
+kubectl get svc -n kong
+```
+
 ### Ingress リソース
 
 Kong ルートは Kubernetes Ingress リソースを使用して設定されます：
@@ -512,20 +580,20 @@ Kong ルートは Kubernetes Ingress リソースを使用して設定されま�
 
 ### Kong Admin API
 
-`http://localhost:32001` で Kong Admin API にアクセス：
+`http://localhost:10081` で Kong Admin API にアクセス：
 
 ```bash
 # Kong ステータスを確認
-curl http://localhost:32001/status
+curl http://localhost:10081/status
 
 # すべてのサービスを一覧表示
-curl http://localhost:32001/services
+curl http://localhost:10081/services
 
 # すべてのルートを一覧表示
-curl http://localhost:32001/routes
+curl http://localhost:10081/routes
 
 # メトリクスを表示
-curl http://localhost:32001/metrics
+curl http://localhost:10081/metrics
 ```
 
 ## 📊 監視と可観測性
@@ -536,7 +604,7 @@ Spring Boot Admin ダッシュボードにアクセス：
 
 ```bash
 # Kong Gateway 経由
-http://localhost:32000/admin
+http://localhost:10080/admin
 
 # 直接アクセス（クラスター内）
 http://admin-server.petclinic.svc.cluster.local:9090
@@ -560,7 +628,7 @@ Kong は Prometheus メトリクスを公開します：
 
 ```bash
 # メトリクスエンドポイントにアクセス
-curl http://localhost:32001/metrics
+curl http://localhost:10081/metrics
 ```
 
 ### サービスログ
