@@ -20,6 +20,7 @@ Thumbs.db
 secrets/
 *.key
 *.pem
+otel/user-values.yaml
 
 # Kubernetes local configs
 kubeconfig

@@ -21,10 +21,13 @@
 
 ## 🚀 デプロイ手順
 
-### 1. ユーザー設定ファイルの編集
+### 1. ユーザー設定ファイルの作成
 
 ```bash
-# user-values.yaml を編集して実際の値を入力
+# テンプレートから user-values.yaml を作成
+cp user-values-template.yaml user-values.yaml
+
+# 作成したファイルを編集して実際の値を入力
 vi user-values.yaml
 ```
 
@@ -187,7 +190,8 @@ kubectl delete namespace splunk-otel
 
 ## ⚠️ 注意事項
 
-- **`user-values.yaml` はGitにコミットしないでください**（すでに `.gitignore` に追加済み）
+- **`user-values-template.yaml` をコピーして `user-values.yaml` を作成してください**
+- **`user-values.yaml` はGitにコミットされません**（`.gitignore` で除外済み）
 - アクセストークンは安全に管理してください
 - 本番環境では、Kubernetes Secret を使用することを推奨します
 

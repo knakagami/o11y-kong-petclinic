@@ -37,8 +37,10 @@ if [ -f "otel/user-values.yaml" ]; then
 else
     print_message "$RED" "✗ user-values.yaml が見つかりません。"
     echo ""
-    print_message "$YELLOW" "Git リポジトリから user-values.yaml が欠落している可能性があります。"
-    echo "otel/user-values.yaml ファイルを作成してください。"
+    print_message "$YELLOW" "テンプレートから user-values.yaml を作成してください:"
+    echo "  cd otel"
+    echo "  cp user-values-template.yaml user-values.yaml"
+    echo "  vi user-values.yaml  # 実際の値を設定"
     echo ""
     exit 1
 fi

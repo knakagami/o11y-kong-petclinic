@@ -713,10 +713,14 @@ OpenTelemetry Collector を導入することで、以下のテレメトリデ�
 **クイックスタート:**
 
 ```bash
-# 1. user-values.yaml を編集
-vi otel/user-values.yaml
+# 1. テンプレートから user-values.yaml を作成
+cd otel
+cp user-values-template.yaml user-values.yaml
 
-# 必須項目を設定:
+# 2. user-values.yaml を編集して実際の値を設定
+vi user-values.yaml
+
+# 必須項目:
 # - splunkObservability.accessToken: Splunk Observability Cloud のアクセストークン
 # - splunkObservability.realm: あなたのレルム（例: us1, us0, eu0, jp0）
 # - clusterName: クラスター名
@@ -727,11 +731,12 @@ vi otel/user-values.yaml
 # - splunkPlatform.endpoint: HEC Endpoint URL
 # - splunkPlatform.index: インデックス名
 
-# 2. OpenTelemetry Collector をデプロイ
+# 3. OpenTelemetry Collector をデプロイ
+cd ..
 chmod +x otel/deploy-otel.sh
 ./otel/deploy-otel.sh
 
-# 3. デプロイを確認
+# 4. デプロイを確認
 kubectl get pods -n splunk-otel
 ```
 
@@ -740,12 +745,14 @@ kubectl get pods -n splunk-otel
 | ファイル | 説明 |
 |---------|------|
 | `otel/values.yaml` | 基本設定（環境非依存）<br>- Operator有効化<br>- Tolerations設定<br>- ログ収集設定 |
-| `otel/user-values.yaml` | **⚠️ 編集必須** 環境固有設定<br>- Splunk Observability Cloud接続情報<br>- Splunk Platform接続情報（オプション） |
+| `otel/user-values-template.yaml` | 環境固有設定のテンプレート<br>- Splunk Observability Cloud接続情報<br>- Splunk Platform接続情報（オプション） |
+| `otel/user-values.yaml` | **⚠️ 作成必須**（.gitignoreで除外）<br>テンプレートからコピーして実際の値を設定 |
 | `otel/deploy-otel.sh` | デプロイ自動化スクリプト |
 
 **⚠️ 重要**: 
-- `otel/user-values.yaml` に実際のアクセストークン、レルム、HECトークン（使用する場合）を設定してください
-- このファイルは `.gitignore` に追加されており、Gitにコミットされません
+1. **`otel/user-values-template.yaml` を `user-values.yaml` にコピー**
+2. **`user-values.yaml` を編集**して実際のアクセストークン、レルム、HECトークン（使用する場合）を設定
+3. **`user-values.yaml` は `.gitignore` に追加されており、Gitにコミットされません**（安全）
 
 ### Splunk Observability Cloud での確認
 
