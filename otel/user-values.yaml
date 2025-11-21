@@ -1,0 +1,46 @@
+# Splunk Observability Cloud 環境固有設定
+# このファイルを編集して実際の値を設定してください
+
+# クラスター名
+clusterName: "petclinic-k3s"
+
+# 環境名
+environment: "production"
+
+# Splunk Observability Cloud 接続設定
+splunkObservability:
+  # アクセストークン（Ingest Token）
+  # Settings > Access Tokens で取得
+  accessToken: "YOUR_ACCESS_TOKEN_HERE"
+  
+  # レルム（例: us0, us1, us2, eu0, jp0）
+  realm: "us1"
+  
+  # ログ送信を有効化
+  logsEnabled: true
+  
+  # プロファイリングを有効化（オプション）
+  profilingEnabled: true
+
+# Splunk Platform (Splunk Enterprise / Splunk Cloud) 接続設定
+# Splunk Platform にもデータを送信する場合は以下を設定
+splunkPlatform:
+  # HEC Token
+  # Settings > Data Inputs > HTTP Event Collector で作成
+  token: "YOUR_HEC_TOKEN_HERE"
+  
+  # HEC Endpoint URL
+  # 例: https://splunk.example.com:8088/services/collector
+  endpoint: "https://YOUR_SPLUNK_HEC_ENDPOINT:8088/services/collector"
+  
+  # インデックス名
+  index: "petclinic"
+  
+  # 自己署名証明書の検証をスキップ（開発環境用）
+  insecureSkipVerify: false
+  
+  # 送信キューの設定
+  sendingQueue:
+    enabled: true
+    persistentQueue:
+      enabled: true
