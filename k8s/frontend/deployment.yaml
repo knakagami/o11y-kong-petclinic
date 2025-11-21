@@ -13,6 +13,8 @@ spec:
       app: frontend
   template:
     metadata:
+      annotations:
+        instrumentation.opentelemetry.io/inject-java: "true"
       labels:
         app: frontend
         tier: frontend

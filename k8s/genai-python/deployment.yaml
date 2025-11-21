@@ -14,6 +14,8 @@ spec:
       app: genai-python
   template:
     metadata:
+      annotations:
+        instrumentation.opentelemetry.io/inject-python: "true"
       labels:
         app: genai-python
         tier: backend

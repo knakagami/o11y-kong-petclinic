@@ -13,6 +13,8 @@ spec:
       app: vets-service
   template:
     metadata:
+      annotations:
+        instrumentation.opentelemetry.io/inject-java: "true"
       labels:
         app: vets-service
         tier: backend
