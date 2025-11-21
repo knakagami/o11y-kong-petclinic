@@ -13,18 +13,14 @@ agent:
   enabled: true
 
 # ログ収集設定
-logsEngine: otel
 logsCollection:
-  enabled: true
   containers:
-    enabled: true
-  k8sEvents:
     enabled: true
 
 # クラスターレシーバー（Kubernetesメトリクス収集）
 clusterReceiver:
   enabled: true
-  k8sEventsEnabled: true
+  eventsEnabled: true
 
 # Operator（自動インストルメンテーション）
 operator:
