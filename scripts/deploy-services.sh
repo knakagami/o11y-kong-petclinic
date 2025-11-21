@@ -2,6 +2,11 @@
 
 # Deploy Spring PetClinic Microservices to Kubernetes (k3s)
 # This script deploys all microservices in the correct order with health checks
+#
+# ⚠️ 注意: このスクリプトは OpenTelemetry 自動計装が有効化されたアプリケーションをデプロイします
+# - OpenTelemetry Operator が default namespace で動作している必要があります
+# - 各 Deployment には instrumentation.opentelemetry.io/inject-* アノテーションが設定されています
+# - リソース制限は OpenTelemetry Agent の追加メモリを考慮して 2倍に設定されています
 
 set -e
 

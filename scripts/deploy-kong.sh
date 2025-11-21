@@ -2,6 +2,13 @@
 
 # Deploy Kong API Gateway with Ingress Controller to Kubernetes (k3s)
 # This script installs Kong using Helm and applies routing configuration
+#
+# ✨ 含まれる機能:
+# - Kong Ingress Controller (Kubernetes ネイティブルーティング)
+# - OpenTelemetry プラグイン (分散トレーシング、トレースコンテキスト伝搬)
+# - CORS プラグイン (グローバル)
+# - Prometheus プラグイン (メトリクス収集)
+# - Rate Limiting プラグイン
 
 set -e
 

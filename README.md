@@ -208,9 +208,23 @@ docker images
 **注意**: dockerグループへの追加は、rootユーザーと同等の権限を付与することになります。セキュリティ上のリスクを理解した上で実施してください。
 
 ### システム要件
-- **メモリ**: 最低 4GB RAM (8GB 推奨)
-- **CPU**: 2+ コア
+
+**⚠️ OpenTelemetry 自動計装を有効化しているため、リソース要件が増加しています。**
+
+- **メモリ**: 最低 8GB RAM (**16GB 以上を強く推奨**)
+- **CPU**: 4+ コア (8+ コア推奨)
 - **ディスク**: 10GB 以上の空き容量
+
+#### リソース配分の内訳
+
+各アプリケーション Pod のリソース制限：
+
+| サービス | メモリ Limit | CPU Limit | メモリ Request | CPU Request |
+|---------|-------------|-----------|---------------|-------------|
+| 通常サービス | 1Gi | 1 core | 512Mi | 500m |
+| Frontend | 1.5Gi | 2 cores | 1Gi | 1 core |
+
+**注意**: OpenTelemetry Java Agent により、通常時より約 300-500MB のメモリ追加が必要です。
 
 ### 前提条件の確認
 
@@ -505,17 +519,33 @@ curl -X POST http://localhost:30080/api/genai-python/chatclient \
 
 ### リソース制限
 
-各サービスには以下のデフォルトリソース設定があります：
+**⚠️ OpenTelemetry 自動計装対応のため、リソース制限を増やしています。**
+
+#### 通常サービス（customers, visits, vets, genai, config, discovery, admin, genai-python）
 
 ```yaml
 resources:
   limits:
+    memory: "1Gi"      # OpenTelemetry Agent 込み
+    cpu: "1"
+  requests:
     memory: "512Mi"
     cpu: "500m"
-  requests:
-    memory: "256Mi"
-    cpu: "250m"
 ```
+
+#### Frontend サービス
+
+```yaml
+resources:
+  limits:
+    memory: "1536Mi"   # 1.5Gi (より大きなメモリが必要)
+    cpu: "2"
+  requests:
+    memory: "1Gi"
+    cpu: "1"
+```
+
+**背景**: OpenTelemetry Java Agent は通常 300-500MB の追加メモリを消費するため、リソース制限を2倍に設定しています。
 
 ### ヘルスチェック
 
@@ -645,11 +675,22 @@ Kong ルートは Kubernetes Ingress リソースを使用して設定されま�
 
 以下の Kong プラグインが設定されています：
 
+#### OpenTelemetry（グローバル） ✨ **NEW**
+- **目的**: 分散トレーシングとトレースコンテキスト伝搬
+- **エンドポイント**: `http://splunk-otel-collector-agent.default.svc.cluster.local:4318/v1/traces`
+- **トレース形式**: W3C Trace Context（`traceparent`, `tracestate`）
+- **伝搬方式**: W3C + B3（抽出と注入）
+- **サンプリングレート**: 100%（すべてのリクエストをトレース）
+- **効果**:
+  - Kong Gateway がトレーススパンを生成
+  - フロントエンド → Kong → バックエンドのエンドツーエンドトレース
+  - 完全なサービス依存関係マップ
+
 #### レート制限
 - 制限: クライアントあたり毎分 100 リクエスト
 - ポリシー: ローカル（インメモリ）
 
-#### CORS
+#### CORS（グローバル）
 - オリジン: `*`（すべてのオリジンを許可）
 - メソッド: GET、POST、PUT、DELETE、PATCH、OPTIONS
 - 資格情報: 有効
@@ -754,6 +795,67 @@ kubectl get pods -n splunk-otel
 2. **`user-values.yaml` を編集**して実際のアクセストークン、レルム、HECトークン（使用する場合）を設定
 3. **`user-values.yaml` は `.gitignore` に追加されており、Gitにコミットされません**（安全）
 
+### アプリケーションの自動計装
+
+**OpenTelemetry Operator** により、アプリケーションコードを変更せずに自動的にトレーシングが有効化されます。
+
+#### 仕組み
+
+すべてのアプリケーション Deployment に以下のアノテーションが追加されています：
+
+```yaml
+# Java アプリケーション用
+annotations:
+  instrumentation.opentelemetry.io/inject-java: "default/splunk-otel-collector"
+
+# Python アプリケーション用
+annotations:
+  instrumentation.opentelemetry.io/inject-python: "default/splunk-otel-collector"
+```
+
+これにより、Operator が自動的に：
+1. **Init Container を注入**: OpenTelemetry SDK とエージェントをダウンロード
+2. **環境変数を設定**: OTLP エンドポイント、サービス名などを自動設定
+3. **自動計装を有効化**: アプリケーション起動時に Java Agent / Python Agent を注入
+
+#### 対象サービス
+
+| サービス | 言語 | 自動計装 |
+|---------|------|----------|
+| customers-service | Java | ✅ |
+| visits-service | Java | ✅ |
+| vets-service | Java | ✅ |
+| genai-service | Java | ✅ |
+| config-server | Java | ✅ |
+| discovery-server | Java | ✅ |
+| admin-server | Java | ✅ |
+| frontend | Java | ✅ |
+| genai-python | Python | ✅ |
+
+### Kong Gateway でのトレース伝搬
+
+**Kong OpenTelemetry プラグイン**が有効化されており、Kong Gateway を経由するリクエストのトレースコンテキストが正しく伝搬されます。
+
+#### 設定内容
+
+```yaml
+# KongClusterPlugin: global-opentelemetry
+config:
+  endpoint: "http://splunk-otel-collector-agent.default.svc.cluster.local:4318/v1/traces"
+  propagation:
+    default_format: "w3c"
+    extract: ["w3c", "b3"]
+    inject: ["w3c", "b3"]
+  sampling_rate: 1.0  # 100% サンプリング
+```
+
+#### 効果
+
+- ✅ Kong Gateway がトレーススパンを生成
+- ✅ `traceparent` / `tracestate` / `baggage` ヘッダーを自動的に伝搬
+- ✅ フロントエンド → Kong → バックエンドサービスのエンドツーエンドトレース
+- ✅ 完全なサービス依存関係マップ
+
 ### Splunk Observability Cloud での確認
 
 デプロイ後、[Splunk Observability Cloud](https://login.signalfx.com/) で以下を確認できます：
@@ -763,24 +865,111 @@ kubectl get pods -n splunk-otel
    - Pod、Node、Container の詳細メトリクス
 
 2. **APM (Application Performance Monitoring)**
-   - サービスマップでマイクロサービス間の依存関係を可視化
-   - 分散トレースとスパンの詳細分析
+   - **Service Map**: マイクロサービス間の依存関係を可視化
+     - `frontend` → `kong-gateway` → `customers-service` → `discovery-server`
+     - `frontend` → `kong-gateway` → `vets-service`
+     - `frontend` → `kong-gateway` → `visits-service`
+   - **Distributed Traces**: リクエストの完全なフローを追跡
+   - **Span Details**: 各サービスの処理時間とエラーを分析
 
 3. **Log Observer**
    - コンテナログの検索と分析
    - Kubernetesイベントの確認
 
+#### 期待される表示
+
+Service Map で以下のサービスが表示されるはずです：
+- `kong-gateway` (API Gateway)
+- `frontend` (Web UI)
+- `customers-service`
+- `visits-service`
+- `vets-service`
+- `genai-service`
+- `genai-python`
+- `config-server`
+- `discovery-server`
+- `admin-server`
+
 ### トラブルシューティング
+
+#### OpenTelemetry Collector
 
 ```bash
 # OpenTelemetry Collector のステータス確認
-kubectl get pods -n splunk-otel
+kubectl get pods -n default | grep splunk-otel-collector
 
 # ログ確認
-kubectl logs -n splunk-otel -l app.kubernetes.io/name=splunk-otel-collector --tail=50
+kubectl logs -n default -l app.kubernetes.io/name=splunk-otel-collector --tail=50
 
 # アンインストール
-helm uninstall splunk-otel-collector -n splunk-otel
+helm uninstall splunk-otel-collector -n default
+```
+
+#### 自動計装の確認
+
+```bash
+# Init Container が注入されているか確認
+kubectl describe pod <pod-name> -n petclinic | grep -A 5 "Init Containers"
+
+# OpenTelemetry Java Agent が起動しているか確認
+kubectl logs <pod-name> -n petclinic | grep -i "opentelemetry"
+
+# 環境変数が注入されているか確認
+kubectl exec <pod-name> -n petclinic -- env | grep OTEL
+```
+
+#### Kong OpenTelemetry プラグイン
+
+```bash
+# プラグインが作成されているか確認
+kubectl get kongclusterplugin -A
+
+# プラグインの詳細を確認
+kubectl describe kongclusterplugin global-opentelemetry
+
+# Kong のログでプラグインが動作しているか確認
+kubectl logs -n kong -l app.kubernetes.io/name=kong --tail=100 | grep -i opentelemetry
+
+# トレースヘッダーが伝搬されているか確認
+curl -v http://localhost:30080/api/vet/vets | grep -i "traceparent\|server-timing"
+```
+
+#### よくある問題と解決方法
+
+**1. Pod が CrashLoopBackOff（メモリ不足）**
+```bash
+# リソース使用状況を確認
+kubectl top pods -n petclinic
+
+# Pod のイベントを確認
+kubectl describe pod <pod-name> -n petclinic
+
+# 解決方法: リソース制限はすでに2倍に設定済み
+# それでも不足する場合は、さらに増やす必要があります
+```
+
+**2. トレースが繋がらない**
+```bash
+# Kong OpenTelemetry プラグインが有効か確認
+kubectl get kongclusterplugin global-opentelemetry
+
+# 自動計装アノテーションが正しいか確認
+kubectl get deployment -n petclinic -o yaml | grep "instrumentation.opentelemetry.io"
+
+# OTel Collector がトレースを受信しているか確認
+kubectl logs -n default -l app=splunk-otel-collector --tail=100 | grep -i trace
+```
+
+**3. Init Container が注入されない**
+```bash
+# Instrumentation リソースが存在するか確認
+kubectl get instrumentation -n default
+
+# Operator が動作しているか確認
+kubectl get pods -n default | grep opentelemetry-operator
+
+# Operator のログを確認
+kubectl logs -n default -l app.kubernetes.io/name=opentelemetry-operator --tail=50
 ```
 
 詳細なトラブルシューティング情報は [otel/README.md](otel/README.md) を参照してください。
