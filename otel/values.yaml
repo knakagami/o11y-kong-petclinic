@@ -1,0 +1,54 @@
+# Splunk Distribution of OpenTelemetry Collector
+# 基本設定ファイル
+#
+# このファイルには環境非依存の基本設定を記載
+# 環境固有の設定（トークン、クラスター名など）は user-values.yaml で管理
+
+# ゲートウェイモードは使用しない
+gateway:
+  enabled: false
+
+# エージェントモード
+agent:
+  enabled: true
+
+# ログ収集設定
+logsEngine: otel
+logsCollection:
+  enabled: true
+  containers:
+    enabled: true
+  k8sEvents:
+    enabled: true
+
+# クラスターレシーバー（Kubernetesメトリクス収集）
+clusterReceiver:
+  enabled: true
+  k8sEventsEnabled: true
+
+# Operator（自動インストルメンテーション）
+operator:
+  enabled: true
+
+# Operator CRDs のインストール
+operatorcrds:
+  install: true
+
+# RBAC設定
+rbac:
+  create: true
+
+# ServiceAccount設定
+serviceAccount:
+  create: true
+
+# Tolerations（コントロールプレーンノードへのデプロイを許可）
+tolerations:
+  - key: node-role.kubernetes.io/master
+    effect: NoSchedule
+  - key: node-role.kubernetes.io/control-plane
+    effect: NoSchedule
+  - key: "CriticalAddonsOnly"
+    effect: NoSchedule
+    operator: "Equal"
+    value: "true"

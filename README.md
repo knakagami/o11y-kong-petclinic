@@ -20,6 +20,7 @@ Spring PetClinic マイクロサービスアプリケーションのクラウド
 - [GenAI Python Service](#genai-python-service)
 - [デプロイの詳細](#デプロイの詳細)
 - [Kong Gateway 設定](#kong-gateway-設定)
+- [オブザーバビリティ（OpenTelemetry）](#オブザーバビリティopentelemetry)
 - [監視と可観測性](#監視と可観測性)
 - [トラブルシューティング](#トラブルシューティング)
 - [クリーンアップ](#クリーンアップ)
@@ -674,6 +675,108 @@ curl http://localhost:30081/routes
 # メトリクスを表示
 curl http://localhost:30081/metrics
 ```
+
+## 🔭 オブザーバビリティ（OpenTelemetry）
+
+このプロジェクトでは、**Splunk Distribution of OpenTelemetry Collector** を使用して、Kubernetesクラスターとアプリケーションの包括的なオブザーバビリティを実現できます。
+
+### 概要
+
+OpenTelemetry Collector を導入することで、以下のテレメトリデータを自動的に収集できます：
+
+- **📊 メトリクス**: Kubernetesクラスター、ノード、Pod、コンテナのメトリクス
+- **📝 ログ**: コンテナログとKubernetesイベント
+- **🔍 トレース**: 分散トレーシングデータ（APM）
+
+**送信先:**
+- **Splunk Observability Cloud**: リアルタイム監視、APM、Infrastructure Monitoring
+- **Splunk Platform** (Splunk Enterprise / Splunk Cloud): ログ分析、長期保存（オプション）
+
+### メリット
+
+- **統合可視性**: すべてのマイクロサービスとインフラを一元的に監視
+- **パフォーマンス分析**: レイテンシ、エラー率、スループットをリアルタイムで追跡
+- **トラブルシューティング**: ログ、メトリクス、トレースを相関させた高度な分析
+- **アラート**: 異常検知とカスタムアラートの設定
+
+### セットアップ
+
+#### 前提条件
+
+- Splunk Observability Cloud アカウント
+- アクセストークン（Ingest Token）
+
+#### デプロイ手順
+
+詳細な手順は **[otel/README.md](otel/README.md)** を参照してください。
+
+**クイックスタート:**
+
+```bash
+# 1. user-values.yaml を編集
+vi otel/user-values.yaml
+
+# 必須項目を設定:
+# - splunkObservability.accessToken: Splunk Observability Cloud のアクセストークン
+# - splunkObservability.realm: あなたのレルム（例: us1, us0, eu0, jp0）
+# - clusterName: クラスター名
+# - environment: 環境名
+
+# オプション: Splunk Platform への送信も設定する場合
+# - splunkPlatform.token: HEC Token
+# - splunkPlatform.endpoint: HEC Endpoint URL
+# - splunkPlatform.index: インデックス名
+
+# 2. OpenTelemetry Collector をデプロイ
+chmod +x otel/deploy-otel.sh
+./otel/deploy-otel.sh
+
+# 3. デプロイを確認
+kubectl get pods -n splunk-otel
+```
+
+#### 設定ファイル
+
+| ファイル | 説明 |
+|---------|------|
+| `otel/values.yaml` | 基本設定（環境非依存）<br>- Operator有効化<br>- Tolerations設定<br>- ログ収集設定 |
+| `otel/user-values.yaml` | **⚠️ 編集必須** 環境固有設定<br>- Splunk Observability Cloud接続情報<br>- Splunk Platform接続情報（オプション） |
+| `otel/deploy-otel.sh` | デプロイ自動化スクリプト |
+
+**⚠️ 重要**: 
+- `otel/user-values.yaml` に実際のアクセストークン、レルム、HECトークン（使用する場合）を設定してください
+- このファイルは `.gitignore` に追加されており、Gitにコミットされません
+
+### Splunk Observability Cloud での確認
+
+デプロイ後、[Splunk Observability Cloud](https://login.signalfx.com/) で以下を確認できます：
+
+1. **Infrastructure Monitoring**
+   - Kubernetes Navigator で `petclinic-k3s` クラスターを表示
+   - Pod、Node、Container の詳細メトリクス
+
+2. **APM (Application Performance Monitoring)**
+   - サービスマップでマイクロサービス間の依存関係を可視化
+   - 分散トレースとスパンの詳細分析
+
+3. **Log Observer**
+   - コンテナログの検索と分析
+   - Kubernetesイベントの確認
+
+### トラブルシューティング
+
+```bash
+# OpenTelemetry Collector のステータス確認
+kubectl get pods -n splunk-otel
+
+# ログ確認
+kubectl logs -n splunk-otel -l app.kubernetes.io/name=splunk-otel-collector --tail=50
+
+# アンインストール
+helm uninstall splunk-otel-collector -n splunk-otel
+```
+
+詳細なトラブルシューティング情報は [otel/README.md](otel/README.md) を参照してください。
 
 ## 📊 監視と可観測性
 
