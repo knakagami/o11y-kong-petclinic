@@ -170,6 +170,43 @@ metadata:
 plugin: prometheus
 
 ---
+# Kong Plugin: OpenTelemetry (for distributed tracing)
+# This plugin sends traces to Splunk OTel Collector and propagates trace context
+apiVersion: configuration.konghq.com/v1
+kind: KongClusterPlugin
+metadata:
+  name: global-opentelemetry
+  annotations:
+    kubernetes.io/ingress.class: kong
+  labels:
+    global: "true"
+config:
+  # OTLP HTTP endpoint for Splunk OTel Collector
+  endpoint: "http://splunk-otel-collector-agent.default.svc.cluster.local:4318/v1/traces"
+  
+  # Resource attributes
+  resource_attributes:
+    service.name: "kong-gateway"
+    deployment.environment: "production"
+  
+  # Trace propagation - W3C Trace Context format
+  header_type: "w3c"
+  
+  # Propagate baggage
+  propagation:
+    extract:
+      - w3c
+      - b3
+    inject:
+      - w3c
+      - b3
+  
+  # Sampling - trace all requests (1.0 = 100%)
+  sampling_rate: 1.0
+  
+plugin: opentelemetry
+
+---
 # Ingress for GenAI Python Service
 apiVersion: networking.k8s.io/v1
 kind: Ingress
