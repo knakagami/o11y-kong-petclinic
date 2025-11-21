@@ -189,17 +189,15 @@ config:
     service.name: "kong-gateway"
     deployment.environment: "production"
   
-  # Trace propagation - W3C Trace Context format
-  header_type: "w3c"
-  
-  # Propagate baggage
+  # Trace propagation configuration
   propagation:
+    default_format: "w3c"
     extract:
-      - w3c
-      - b3
+      - "w3c"
+      - "b3"
     inject:
-      - w3c
-      - b3
+      - "w3c"
+      - "b3"
   
   # Sampling - trace all requests (1.0 = 100%)
   sampling_rate: 1.0
