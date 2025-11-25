@@ -35,6 +35,9 @@ spec:
           value: "docker"
         - name: SPRING_CONFIG_LOCATION
           value: "classpath:/,file:/config/"
+        # Use IP address instead of hostname for Eureka registration
+        - name: EUREKA_INSTANCE_PREFER_IP_ADDRESS
+          value: "true"
         # Disable Spring Boot's built-in tracing (OpenTelemetry handles all tracing)
         - name: MANAGEMENT_TRACING_ENABLED
           value: "false"
