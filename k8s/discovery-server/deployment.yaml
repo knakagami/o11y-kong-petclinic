@@ -29,6 +29,9 @@ spec:
         env:
         - name: CONFIG_SERVER_URL
           value: "http://config-server:8888"
+        # Disable Spring Boot's built-in tracing (OpenTelemetry handles all tracing)
+        - name: MANAGEMENT_TRACING_ENABLED
+          value: "false"
         resources:
           limits:
             memory: "1Gi"

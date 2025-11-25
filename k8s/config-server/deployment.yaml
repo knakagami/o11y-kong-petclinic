@@ -26,6 +26,10 @@ spec:
         - containerPort: 8888
           name: http
           protocol: TCP
+        env:
+        # Disable Spring Boot's built-in tracing (OpenTelemetry handles all tracing)
+        - name: MANAGEMENT_TRACING_ENABLED
+          value: "false"
         resources:
           limits:
             memory: "1Gi"
