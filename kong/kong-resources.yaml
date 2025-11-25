@@ -94,28 +94,100 @@ spec:
               number: 8085
 
 ---
-# Ingress for API Gateway (Frontend's Spring Cloud Gateway routes)
-# This is for the frontend's gateway functionality (aggregation of backend APIs)
+# Ingress for API Gateway - Owners (redirects to customers-service)
+# /api/gateway/owners/** -> /owners/** (customers-service)
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: gateway-ingress
+  name: gateway-owners-ingress
   namespace: petclinic
   annotations:
-    konghq.com/strip-path: "false"
+    konghq.com/strip-path: "true"
     kubernetes.io/ingress.class: kong
 spec:
   ingressClassName: kong
   rules:
   - http:
       paths:
-      - path: /api/gateway
+      - path: /api/gateway/owners
         pathType: Prefix
         backend:
           service:
-            name: frontend
+            name: customers-service
             port:
-              number: 8080
+              number: 8081
+
+---
+# Ingress for API Gateway - Pets (redirects to customers-service)
+# /api/gateway/pets/** -> /pets/** (customers-service)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gateway-pets-ingress
+  namespace: petclinic
+  annotations:
+    konghq.com/strip-path: "true"
+    kubernetes.io/ingress.class: kong
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - path: /api/gateway/pets
+        pathType: Prefix
+        backend:
+          service:
+            name: customers-service
+            port:
+              number: 8081
+
+---
+# Ingress for API Gateway - Visits (redirects to visits-service)
+# /api/gateway/visits/** -> /visits/** (visits-service)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gateway-visits-ingress
+  namespace: petclinic
+  annotations:
+    konghq.com/strip-path: "true"
+    kubernetes.io/ingress.class: kong
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - path: /api/gateway/visits
+        pathType: Prefix
+        backend:
+          service:
+            name: visits-service
+            port:
+              number: 8082
+
+---
+# Ingress for API Gateway - Vets (redirects to vets-service)
+# /api/gateway/vets/** -> /vets/** (vets-service)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gateway-vets-ingress
+  namespace: petclinic
+  annotations:
+    konghq.com/strip-path: "true"
+    kubernetes.io/ingress.class: kong
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - path: /api/gateway/vets
+        pathType: Prefix
+        backend:
+          service:
+            name: vets-service
+            port:
+              number: 8083
 
 ---
 # Ingress for Admin Server (optional - for management UI)
