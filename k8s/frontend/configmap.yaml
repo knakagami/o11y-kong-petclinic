@@ -84,6 +84,17 @@ data:
       endpoint:
         health:
           show-details: always
+      # Disable Spring Boot's built-in tracing (using OpenTelemetry instead)
+      tracing:
+        enabled: false
+      zipkin:
+        tracing:
+          endpoint: ""  # Disable Zipkin exporter
+      
+    # Disable Spring Cloud Sleuth Zipkin (OpenTelemetry handles all tracing)
+    # This prevents duplicate traces to localhost:9411
+    spring.zipkin.enabled: false
+    spring.sleuth.enabled: false
 
     logging:
       level:
