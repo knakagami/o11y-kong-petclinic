@@ -22,6 +22,39 @@ data:
         gateway:
           # フロントエンド専用設定: バックエンドAPIルーティングは全てKong Gatewayに転送
           routes:
+            # API Gateway routes (for Angular SPA compatibility)
+            # /api/gateway/owners/** -> /api/customer/owners/**
+            - id: gateway-owners
+              uri: http://kong-gateway-proxy.kong.svc.cluster.local:8000
+              predicates:
+                - Path=/api/gateway/owners/**
+              filters:
+                - RewritePath=/api/gateway/owners/(?<segment>.*), /api/customer/owners/$\{segment}
+            
+            # /api/gateway/pets/** -> /api/customer/pets/**
+            - id: gateway-pets
+              uri: http://kong-gateway-proxy.kong.svc.cluster.local:8000
+              predicates:
+                - Path=/api/gateway/pets/**
+              filters:
+                - RewritePath=/api/gateway/pets/(?<segment>.*), /api/customer/pets/$\{segment}
+            
+            # /api/gateway/visits/** -> /api/visit/visits/**
+            - id: gateway-visits
+              uri: http://kong-gateway-proxy.kong.svc.cluster.local:8000
+              predicates:
+                - Path=/api/gateway/visits/**
+              filters:
+                - RewritePath=/api/gateway/visits/(?<segment>.*), /api/visit/visits/$\{segment}
+            
+            # /api/gateway/vets -> /api/vet/vets
+            - id: gateway-vets
+              uri: http://kong-gateway-proxy.kong.svc.cluster.local:8000
+              predicates:
+                - Path=/api/gateway/vets
+              filters:
+                - RewritePath=/api/gateway/vets, /api/vet/vets
+            
             # Customers API - Kong経由
             - id: customers-service
               uri: http://kong-gateway-proxy.kong.svc.cluster.local:8000

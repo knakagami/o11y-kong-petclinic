@@ -102,7 +102,7 @@ metadata:
   name: gateway-ingress
   namespace: petclinic
   annotations:
-    konghq.com/strip-path: "true"
+    konghq.com/strip-path: "false"
     kubernetes.io/ingress.class: kong
 spec:
   ingressClassName: kong
