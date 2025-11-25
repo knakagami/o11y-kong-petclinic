@@ -94,6 +94,30 @@ spec:
               number: 8085
 
 ---
+# Ingress for API Gateway (Frontend's Spring Cloud Gateway routes)
+# This is for the frontend's gateway functionality (aggregation of backend APIs)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gateway-ingress
+  namespace: petclinic
+  annotations:
+    konghq.com/strip-path: "true"
+    kubernetes.io/ingress.class: kong
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - path: /api/gateway
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend
+            port:
+              number: 8080
+
+---
 # Ingress for Admin Server (optional - for management UI)
 apiVersion: networking.k8s.io/v1
 kind: Ingress
