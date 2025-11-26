@@ -198,20 +198,30 @@ kubectl create secret generic genai-secrets \
 
 このサービスはOpenTelemetry Operatorによって自動的に計装されます。
 
-Deployment YAMLに以下のアノテーションが設定されています:
+Deployment YAMLに以下の設定があります:
 
 ```yaml
 metadata:
   annotations:
+    # OpenTelemetry Operatorによる自動計装
     instrumentation.opentelemetry.io/inject-python: "default/splunk-otel-collector"
+spec:
+  containers:
+  - env:
+    # リソース属性の設定
+    - name: OTEL_RESOURCE_ATTRIBUTES
+      value: "service.namespace=petclinic,deployment.environment=production"
 ```
 
 これにより、以下が自動的に実行されます:
 - OpenTelemetry Python Agentのインジェクション
 - 分散トレーシングの有効化
 - メトリクスとログの収集
+- リソース属性の自動付与（`service.namespace=petclinic`, `deployment.environment=production`）
 
-注意: 自動計装により、メモリとCPUのリソース使用量が増加します。
+注意: 
+- 自動計装により、メモリとCPUのリソース使用量が増加します
+- `deployment.environment` の値は `otel/user-values.yaml` の `environment` と一致させてください
 
 ### デプロイ
 

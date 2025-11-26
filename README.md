@@ -685,7 +685,14 @@ curl http://localhost:8001/plugins | jq '.data[] | {name, enabled}'
 # k8s/*/deployment.yaml
 metadata:
   annotations:
+    # OpenTelemetry Operatorによる自動計装
     instrumentation.opentelemetry.io/inject-java: "default/splunk-otel-collector"
+spec:
+  containers:
+  - env:
+    # リソース属性の設定
+    - name: OTEL_RESOURCE_ATTRIBUTES
+      value: "service.namespace=petclinic,deployment.environment=production"
 ```
 
 **効果**:
@@ -693,6 +700,7 @@ metadata:
 - データベースクエリの自動トレース
 - JVM メトリクスの自動収集
 - トレースコンテキストの自動伝搬
+- リソース属性の自動付与（`service.namespace=petclinic`, `deployment.environment=production`）
 
 #### Python Services
 
@@ -703,7 +711,14 @@ GenAI Python ServiceはOpenTelemetry Python Agentで自動計装されていま�
 # k8s/genai-python/deployment.yaml
 metadata:
   annotations:
+    # OpenTelemetry Operatorによる自動計装
     instrumentation.opentelemetry.io/inject-python: "default/splunk-otel-collector"
+spec:
+  containers:
+  - env:
+    # リソース属性の設定
+    - name: OTEL_RESOURCE_ATTRIBUTES
+      value: "service.namespace=petclinic,deployment.environment=production"
 ```
 
 #### Spring Boot Zipkinの無効化
@@ -744,9 +759,14 @@ Kong GatewayはOpenTelemetryプラグインでトレースコンテキストを�
 kind: KongClusterPlugin
 metadata:
   name: global-opentelemetry
+  labels:
+    global: "true"  # クラスタ全体に適用
 config:
   endpoint: "http://splunk-otel-collector-agent.default.svc.cluster.local:4318/v1/traces"
-  header_type: "w3c"
+  resource_attributes:
+    service.name: "kong-gateway"
+    service.namespace: "kong-gateway-services"
+    deployment.environment: "production"  # ← otel/user-values.yaml の environment と一致させる
   propagation:
     default_format: "w3c"
     extract: ["w3c", "b3", "jaeger"]
@@ -759,6 +779,32 @@ config:
 - W3C Trace Contextの注入（バックエンドへ）
 - B3、Jaegerフォーマットのサポート
 - OTLPエクスポート（Splunk OTel Collectorへ）
+
+**重要な注意事項**:
+
+1. **環境値の同期が必要**
+   
+   以下の3つのファイルで `deployment.environment` / `environment` の値を一致させてください：
+   
+   ```bash
+   # 1. otel/user-values.yaml
+   environment: "production"
+   
+   # 2. kong/kong-resources.yaml
+   resource_attributes:
+     deployment.environment: "production"  # ← 一致させる
+   
+   # 3. k8s/*/deployment.yaml (全マイクロサービス)
+   env:
+   - name: OTEL_RESOURCE_ATTRIBUTES
+     value: "service.namespace=petclinic,deployment.environment=production"  # ← 一致させる
+   ```
+   
+   環境を変更する場合は、これら3箇所を手動で更新してください。
+
+2. **Kong 4.0 以降の変更**
+   
+   `header_type` パラメータは Kong 4.0 以降非推奨です。`propagation` 設定のみを使用してください。
 
 ---
 

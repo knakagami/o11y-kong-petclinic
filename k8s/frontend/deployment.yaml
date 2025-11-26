@@ -43,6 +43,9 @@ spec:
           value: "false"
         - name: MANAGEMENT_ZIPKIN_TRACING_ENDPOINT
           value: ""
+        # OpenTelemetry resource attributes
+        - name: OTEL_RESOURCE_ATTRIBUTES
+          value: "service.namespace=petclinic,deployment.environment=production"
         volumeMounts:
         - name: config
           mountPath: /config

@@ -35,6 +35,9 @@ spec:
         # Disable Spring Boot's built-in tracing (OpenTelemetry handles all tracing)
         - name: MANAGEMENT_TRACING_ENABLED
           value: "false"
+        # OpenTelemetry resource attributes
+        - name: OTEL_RESOURCE_ATTRIBUTES
+          value: "service.namespace=petclinic,deployment.environment=production"
         resources:
           limits:
             memory: "1Gi"

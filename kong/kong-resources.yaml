@@ -379,12 +379,11 @@ config:
   # OTLP HTTP endpoint for Splunk OTel Collector
   endpoint: "http://splunk-otel-collector-agent.default.svc.cluster.local:4318/v1/traces"
   
-  # Header type for trace context propagation
-  header_type: "w3c"
-  
-  # Resource attributes
+  # Resource attributes (OpenTelemetry Semantic Conventions)
+  # NOTE: deployment.environment の値は otel/user-values.yaml の environment と一致させてください
   resource_attributes:
     service.name: "kong-gateway"
+    service.namespace: "kong-gateway-services"
     deployment.environment: "production"
   
   # Trace propagation configuration

@@ -46,6 +46,9 @@ spec:
               key: openai-api-key
         - name: OPENAI_MODEL
           value: "gpt-4o-mini"
+        # OpenTelemetry resource attributes
+        - name: OTEL_RESOURCE_ATTRIBUTES
+          value: "service.namespace=petclinic,deployment.environment=production"
         # Azure OpenAI Configuration (alternative to OpenAI)
         # - name: AZURE_OPENAI_KEY
         #   valueFrom:

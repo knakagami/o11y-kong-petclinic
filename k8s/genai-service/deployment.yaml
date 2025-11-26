@@ -33,6 +33,9 @@ spec:
           value: "http://discovery-server:8761/eureka"
         - name: MANAGEMENT_TRACING_ENABLED
           value: "false"
+        # OpenTelemetry resource attributes
+        - name: OTEL_RESOURCE_ATTRIBUTES
+          value: "service.namespace=petclinic,deployment.environment=production"
         # Optional: Set these environment variables if you want to use GenAI features
         # - name: OPENAI_API_KEY
         #   valueFrom:
