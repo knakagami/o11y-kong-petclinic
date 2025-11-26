@@ -94,17 +94,20 @@ spec:
               number: 8085
 
 ---
-# Kong Request Transformer Plugin for /api/gateway/owners/** → /owners/**
-# Works with strip-path: /api/gateway/owners/3 -> strip -> /3 -> transform -> /owners/3
+# Kong Pre-function Plugin for /api/gateway/owners/** → /owners/**
+# Uses Lua to rewrite: /api/gateway/owners/3 -> /owners/3
 apiVersion: configuration.konghq.com/v1
 kind: KongPlugin
 metadata:
-  name: request-transformer-gateway-owners
+  name: rewrite-gateway-owners
   namespace: petclinic
-plugin: request-transformer
+plugin: pre-function
 config:
-  replace:
-    uri: "/owners$(uri)"
+  access:
+    - |
+      local path = kong.request.get_path()
+      local new_path = path:gsub("^/api/gateway/owners", "/owners")
+      kong.service.request.set_path(new_path)
 
 ---
 # Ingress for /api/gateway/owners/** → customers-service /owners/**
@@ -114,8 +117,7 @@ metadata:
   name: gateway-owners-ingress
   namespace: petclinic
   annotations:
-    konghq.com/strip-path: "true"
-    konghq.com/plugins: request-transformer-gateway-owners
+    konghq.com/plugins: rewrite-gateway-owners
     kubernetes.io/ingress.class: kong
 spec:
   ingressClassName: kong
@@ -131,16 +133,20 @@ spec:
               number: 8081
 
 ---
-# Kong Request Transformer Plugin for /api/gateway/petTypes → /petTypes
+# Kong Pre-function Plugin for /api/gateway/petTypes → /petTypes
+# Uses Lua to rewrite: /api/gateway/petTypes -> /petTypes
 apiVersion: configuration.konghq.com/v1
 kind: KongPlugin
 metadata:
-  name: request-transformer-gateway-pettypes
+  name: rewrite-gateway-pettypes
   namespace: petclinic
-plugin: request-transformer
+plugin: pre-function
 config:
-  replace:
-    uri: "/petTypes"
+  access:
+    - |
+      local path = kong.request.get_path()
+      local new_path = path:gsub("^/api/gateway/petTypes", "/petTypes")
+      kong.service.request.set_path(new_path)
 
 ---
 # Ingress for /api/gateway/petTypes → customers-service /petTypes
@@ -150,7 +156,7 @@ metadata:
   name: gateway-pettypes-ingress
   namespace: petclinic
   annotations:
-    konghq.com/plugins: request-transformer-gateway-pettypes
+    konghq.com/plugins: rewrite-gateway-pettypes
     kubernetes.io/ingress.class: kong
 spec:
   ingressClassName: kong
@@ -166,17 +172,20 @@ spec:
               number: 8081
 
 ---
-# Kong Request Transformer Plugin for /api/gateway/pets/** → /pets/**
-# Works with strip-path: /api/gateway/pets/123 -> strip -> /123 -> transform -> /pets/123
+# Kong Pre-function Plugin for /api/gateway/pets/** → /pets/**
+# Uses Lua to rewrite: /api/gateway/pets/1 -> /pets/1
 apiVersion: configuration.konghq.com/v1
 kind: KongPlugin
 metadata:
-  name: request-transformer-gateway-pets
+  name: rewrite-gateway-pets
   namespace: petclinic
-plugin: request-transformer
+plugin: pre-function
 config:
-  replace:
-    uri: "/pets$(uri)"
+  access:
+    - |
+      local path = kong.request.get_path()
+      local new_path = path:gsub("^/api/gateway/pets", "/pets")
+      kong.service.request.set_path(new_path)
 
 ---
 # Ingress for /api/gateway/pets/** → customers-service /pets/**
@@ -186,8 +195,7 @@ metadata:
   name: gateway-pets-ingress
   namespace: petclinic
   annotations:
-    konghq.com/strip-path: "true"
-    konghq.com/plugins: request-transformer-gateway-pets
+    konghq.com/plugins: rewrite-gateway-pets
     kubernetes.io/ingress.class: kong
 spec:
   ingressClassName: kong
@@ -203,17 +211,20 @@ spec:
               number: 8081
 
 ---
-# Kong Request Transformer Plugin for /api/gateway/visits/** → /visits/**
-# Works with strip-path: /api/gateway/visits/456 -> strip -> /456 -> transform -> /visits/456
+# Kong Pre-function Plugin for /api/gateway/visits/** → /visits/**
+# Uses Lua to rewrite: /api/gateway/visits/1 -> /visits/1
 apiVersion: configuration.konghq.com/v1
 kind: KongPlugin
 metadata:
-  name: request-transformer-gateway-visits
+  name: rewrite-gateway-visits
   namespace: petclinic
-plugin: request-transformer
+plugin: pre-function
 config:
-  replace:
-    uri: "/visits$(uri)"
+  access:
+    - |
+      local path = kong.request.get_path()
+      local new_path = path:gsub("^/api/gateway/visits", "/visits")
+      kong.service.request.set_path(new_path)
 
 ---
 # Ingress for /api/gateway/visits/** → visits-service /visits/**
@@ -223,8 +234,7 @@ metadata:
   name: gateway-visits-ingress
   namespace: petclinic
   annotations:
-    konghq.com/strip-path: "true"
-    konghq.com/plugins: request-transformer-gateway-visits
+    konghq.com/plugins: rewrite-gateway-visits
     kubernetes.io/ingress.class: kong
 spec:
   ingressClassName: kong
@@ -240,16 +250,20 @@ spec:
               number: 8082
 
 ---
-# Kong Request Transformer Plugin for /api/gateway/vets → /vets
+# Kong Pre-function Plugin for /api/gateway/vets → /vets
+# Uses Lua to rewrite: /api/gateway/vets -> /vets
 apiVersion: configuration.konghq.com/v1
 kind: KongPlugin
 metadata:
-  name: request-transformer-gateway-vets
+  name: rewrite-gateway-vets
   namespace: petclinic
-plugin: request-transformer
+plugin: pre-function
 config:
-  replace:
-    uri: "/vets"
+  access:
+    - |
+      local path = kong.request.get_path()
+      local new_path = path:gsub("^/api/gateway/vets", "/vets")
+      kong.service.request.set_path(new_path)
 
 ---
 # Ingress for /api/gateway/vets → vets-service /vets
@@ -259,7 +273,7 @@ metadata:
   name: gateway-vets-ingress
   namespace: petclinic
   annotations:
-    konghq.com/plugins: request-transformer-gateway-vets
+    konghq.com/plugins: rewrite-gateway-vets
     kubernetes.io/ingress.class: kong
 spec:
   ingressClassName: kong
