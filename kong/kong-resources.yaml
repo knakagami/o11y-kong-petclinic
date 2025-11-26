@@ -94,29 +94,21 @@ spec:
               number: 8085
 
 ---
-# Ingress for /api/gateway -> strip only /api/gateway prefix
-# This single Ingress handles all /api/gateway/** routes
-# Examples:
-#   /api/gateway/owners/3 -> /owners/3 (customers-service)
-#   /api/gateway/pets/5 -> /pets/5 (customers-service) 
-#   /api/gateway/visits/7 -> /visits/7 (visits-service)
-#   /api/gateway/vets -> /vets (vets-service)
-# 
-# Note: We need to use Kong Ingress Controller path handling carefully
+# Ingress for /api/gateway -> DO NOT strip path
+# Send full path /api/gateway/** to frontend, let frontend handle routing
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: gateway-ingress
   namespace: petclinic
   annotations:
-    konghq.com/strip-path: "true"
+    konghq.com/strip-path: "false"
     kubernetes.io/ingress.class: kong
 spec:
   ingressClassName: kong
   rules:
   - http:
       paths:
-      # Must be ordered by specificity (most specific first)
       - path: /api/gateway
         pathType: Prefix
         backend:
