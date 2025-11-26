@@ -1,245 +1,352 @@
-# Kong API Gateway を使用した Spring PetClinic on Kubernetes
+# Spring PetClinic Microservices with Kong API Gateway & Splunk Observability
 
-Spring PetClinic マイクロサービスアプリケーションのクラウドネイティブ実装です。API 管理に Kong API Gateway を使用し、Kubernetes (k3s) 上にデプロイします。
+Spring PetClinicをマイクロサービスとして実装し、Kong API Gateway、OpenTelemetry、Splunk Observability Cloudを統合してKubernetes (k3s) 上にデプロイします。
 
 > **⚠️ 重要な注意事項**
 > 
 > このプロジェクトのコードは **Cursor AI** によって生成されました。
 > - すべてのKubernetesマニフェスト、デプロイメントスクリプト、設定ファイルはAIによって自動生成されています
 > - 予期しない動作や設定ミスが含まれる可能性があります
-> - 本番環境で使用する前に、すべての設定を十分に検証してください
-> - このプロジェクトはデモンストレーション目的であり、本番環境での使用は推奨されません
+> - **このプロジェクトはデモンストレーション・学習目的であり、商用利用は想定していません**
+> - 本番環境での使用は推奨されません
 
 ## 📋 目次
 
-- [オリジナルからのカスタマイズ](#オリジナルからのカスタマイズ)
+- [プロジェクト概要](#プロジェクト概要)
 - [アーキテクチャ](#アーキテクチャ)
+- [主要コンポーネント](#主要コンポーネント)
 - [前提条件](#前提条件)
-- [クイックスタート](#クイックスタート)
-- [API エンドポイント](#api-エンドポイント)
-- [GenAI Python Service](#genai-python-service)
-- [デプロイの詳細](#デプロイの詳細)
-- [Kong Gateway 設定](#kong-gateway-設定)
-- [オブザーバビリティ（OpenTelemetry）](#オブザーバビリティopentelemetry)
-- [監視と可観測性](#監視と可観測性)
-- [トラブルシューティング](#トラブルシューティング)
+- [セットアップ手順](#セットアップ手順)
+- [デプロイ手順](#デプロイ手順)
+- [アクセス方法](#アクセス方法)
+- [オブザーバビリティ](#オブザーバビリティ)
 - [クリーンアップ](#クリーンアップ)
 
-## 🔄 オリジナルからのカスタマイズ
+---
 
-このプロジェクトは、[Spring PetClinic Microservices](https://github.com/spring-petclinic/spring-petclinic-microservices)をベースに、以下のカスタマイズを施しています：
+## 🎯 プロジェクト概要
 
-### 1. Kong API Gatewayへの置き換え ✨
+このプロジェクトは、[Spring PetClinic Microservices](https://github.com/spring-petclinic/spring-petclinic-microservices)をベースに、エンタープライズグレードのAPI管理とオブザーバビリティを追加した実装です。
 
-**変更内容:**
-- Spring Cloud Gatewayを**Kong API Gateway**に置き換え
-- Kubernetesネイティブなイングレスコントローラーとして実装
-- 高度なAPI管理機能を追加
+### 主な特徴
 
-**メリット:**
-- エンタープライズグレードのAPI管理
-- プラグインエコシステム（レート制限、認証、ロギングなど）
-- Prometheusメトリクス統合
-- より優れたパフォーマンスとスケーラビリティ
+1. **Kong API Gateway** - Spring Cloud Gatewayの代わりにKongを使用
+   - Kubernetes Ingress Controller
+   - Lua Pre-functionによる高度なパス書き換え
+   - OpenTelemetry統合による分散トレーシング
 
-### 2. Python版GenAI Serviceの追加 🐍
+2. **Splunk Observability Cloud統合** - フルスタックオブザーバビリティ
+   - OpenTelemetry Collectorによるメトリクス・トレース・ログ収集
+   - OpenTelemetry Operatorによる自動計装（Java/Python）
+   - APM、Infrastructure Monitoring、Log Observer
 
-**新規追加:**
-- FastAPI + LangChainベースのPython実装
-- Java版と同等の機能を提供
-- ポート8085で並行稼働可能
+3. **Angular SPA Web UI** - ブラウザからアクセス可能なフロントエンド
+   - ペットオーナー、ペット、獣医師の管理
+   - AI チャット機能（GenAI Service）
 
-**特徴:**
-- LangChain Agentによる会話型AI
-- Chromaベクターストアを使用したRAG
-- OpenAI / Azure OpenAI対応
-- 詳細は[genai-python/README.md](genai-python/README.md)を参照
-
-**比較:**
-
-| 項目 | Java版 | Python版 |
-|-----|--------|---------|
-| フレームワーク | Spring Boot | FastAPI |
-| AI統合 | Spring AI | LangChain |
-| ベクターストア | SimpleVectorStore | Chroma |
-| ポート | 8084 | 8085 |
-| Kong パス | `/api/genai` | `/api/genai-python` |
-
-### 3. Zipkin トレーシングの無効化 🔧
-
-**変更内容:**
-- GenAI Service（Java版）のZipkin依存を削除
-- CrashLoopBackOffの問題を解決
-
-**理由:**
-- Zipkinサーバーが未デプロイの環境でのエラー回避
-- シンプルなデプロイメント構成
-
-**実装:**
-```yaml
-# k8s/genai-service/deployment.yaml
-env:
-- name: MANAGEMENT_TRACING_ENABLED
-  value: "false"
-```
-
-### 4. Web UIの追加 🖥️
-
-**新規追加:**
-- 元のAngular製SPAをフロントエンド専用としてデプロイ
-- Kong Gateway経由でWeb UIにアクセス可能
-- バックエンドAPIは全てKong経由で呼び出し
-
-**特徴:**
-- ルートパス `/` でWeb UIを提供
-- ペットオーナー、ペット、獣医師の管理画面
-- 診察記録の登録・閲覧機能
-
-### 5. Kubernetes最適化
-
-**追加機能:**
-- k3s対応のデプロイメント設定
-- NodePortサービスでの外部アクセス
-- ヘルスチェックプローブの最適化
-- リソース制限の適切な設定
+4. **Python版GenAI Service** - FastAPI + LangChain実装
+   - OpenAI API統合
+   - RAG（Retrieval-Augmented Generation）
+   - 会話型AIエージェント
 
 ---
 
 ## 🏗️ アーキテクチャ
 
-このプロジェクトは、従来の Spring Cloud Gateway を Kong API Gateway に置き換え、レート制限、認証、高度なルーティングなどの強化された API 管理機能を提供します。
+### システム全体図
 
 ```
-                            ┌─────────────┐
-                            │   Browser   │
-                            └──────┬──────┘
-                                   │
-                ┌──────────────────▼──────────────────────┐
-                │         Kong API Gateway                │
-                │  (NodePort: 30080/30443/30081           │
-                │   → NLB: 30080/30443/30081)             │
-                └──┬────────┬──────────┬──────────┬───────┘
-                   │        │          │          │
-          ┌────────▼───┐    │          │          │
-          │  Frontend  │    │          │          │
-          │ (Web UI)   │    │          │          │
-          │ Angular SPA│    │          │          │
-          │   (8080)   │    │          │          │
-          └────────────┘    │          │          │
-                            │          │          │
-               ┌────────────▼──┐ ┌────▼─────┐ ┌──▼───────┐
-               │   Customers   │ │  Visits  │ │   Vets   │
-               │    Service    │ │  Service │ │  Service │
-               │    (8081)     │ │  (8082)  │ │  (8083)  │
-               └───────┬───────┘ └────┬─────┘ └─────┬────┘
-                       │              │             │
-                       └──────────────┼─────────────┘
-                                      │
-                             ┌────────▼─────────┐
-                             │ Discovery Server │
-                             │    (Eureka)      │
-                             │     (8761)       │
-                             └────────┬─────────┘
-                                      │
-                             ┌────────▼─────────┐
-                             │  Config Server   │
-                             │     (8888)       │
-                             └──────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                       External Access                            │
+│                                                                  │
+│  Browser / API Client  →  k3s NodePort (30080)                  │
+└──────────────────────────────────────────────────────────────────┘
+                                  ↓
+┌──────────────────────────────────────────────────────────────────┐
+│                      Kong API Gateway                            │
+│                     (Ingress Controller)                         │
+│                                                                  │
+│  • Lua Pre-function: /api/gateway/** → /owners/**               │
+│  • OpenTelemetry Plugin: Trace Context Propagation              │
+│  • CORS Plugin: Cross-Origin Support                            │
+└──────────────────────────────────────────────────────────────────┘
+                      ↓               ↓               ↓
+┌───────────────┐  ┌───────────────┐  ┌───────────────┐  ┌───────────────┐
+│   Frontend    │  │   Customers   │  │    Visits     │  │     Vets      │
+│   (Angular)   │  │    Service    │  │    Service    │  │    Service    │
+│               │  │               │  │               │  │               │
+│   Port 8080   │  │   Port 8081   │  │   Port 8082   │  │   Port 8083   │
+└───────────────┘  └───────────────┘  └───────────────┘  └───────────────┘
+                                          ↓
+                   ┌───────────────┐  ┌───────────────┐  ┌───────────────┐
+                   │     GenAI     │  │ GenAI-Python  │  │     Admin     │
+                   │    Service    │  │   (FastAPI)   │  │    Server     │
+                   │               │  │               │  │               │
+                   │   Port 8084   │  │   Port 8085   │  │   Port 9090   │
+                   └───────────────┘  └───────────────┘  └───────────────┘
+                            ↓                 ↓
+┌──────────────────────────────────────────────────────────────────┐
+│               Infrastructure Services                            │
+│                                                                  │
+│  ┌───────────────┐  ┌───────────────┐                          │
+│  │    Config     │  │   Discovery   │                          │
+│  │    Server     │  │    Server     │                          │
+│  │               │  │   (Eureka)    │                          │
+│  │   Port 8888   │  │   Port 8761   │                          │
+│  └───────────────┘  └───────────────┘                          │
+└──────────────────────────────────────────────────────────────────┘
+                                  ↓
+┌──────────────────────────────────────────────────────────────────┐
+│               Observability Stack                                │
+│                                                                  │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │      Splunk OpenTelemetry Collector (DaemonSet)            │ │
+│  │                                                            │ │
+│  │  • Auto-instrumentation (Java/Python)                     │ │
+│  │  • Metrics, Traces, Logs collection                       │ │
+│  │  • Export to Splunk Observability Cloud                   │ │
+│  └────────────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────────┘
+                                  ↓
+                     ┌─────────────────────────┐
+                     │  Splunk Observability   │
+                     │         Cloud           │
+                     │                         │
+                     │  • APM                  │
+                     │  • Infrastructure       │
+                     │  • Log Observer         │
+                     └─────────────────────────┘
 ```
 
-### コンポーネント
+### リクエストフロー
 
-#### インフラストラクチャサービス
-- **Config Server** (8888): 集中設定管理
-- **Discovery Server** (8761): サービスディスカバリー用の Eureka サービスレジストリ
-- **Admin Server** (9090): 監視用の Spring Boot Admin
+#### 1. Web UIへのアクセス
 
-#### フロントエンド
-- **Frontend (Web UI)** (8080): Angular製のWeb UI（SPA） ✨ **NEW**
-  - ブラウザからアクセス可能なWebインターフェース
-  - バックエンドAPIはKong経由で呼び出し
-  - ペットオーナー、ペット、獣医師、診察記録の管理画面
+```
+Browser Request: GET http://localhost:30080/
+                                ↓
+                        Kong API Gateway
+                    (Ingress Match: /)
+                                ↓
+                        Frontend Service
+                         (Port 8080)
+                                ↓
+        Angular SPA (index.html, JS, CSS) を返却
+                                ↓
+                    Browser でレンダリング
+```
 
-#### ビジネスサービス
-- **Customers Service** (8081): ペットオーナーとペットの管理
-- **Visits Service** (8082): 獣医診察記録の管理
-- **Vets Service** (8083): 獣医師情報の管理
-- **GenAI Service** (8084): AI 機能（Java版、Spring AI使用）
-- **GenAI Python Service** (8085): AI 機能（Python版、FastAPI + LangChain使用）✨ **NEW**
+#### 2. Angular SPA から Backend API へのリクエスト
 
-#### API Gateway
-- **Kong Gateway**: Spring Cloud Gateway を置き換える API ゲートウェイ
-  - トラフィックルーティングとロードバランシング
-  - レート制限とスロットリング
-  - CORS 処理
-  - リクエスト/レスポンス変換
-  - メトリクス収集（Prometheus）
+```
+Browser (Angular SPA) 内の JavaScript が実行:
+  → fetch('/api/gateway/owners/3')
+                ↓
+        Kong API Gateway
+    (Ingress Match: /api/gateway/owners/**)
+                ↓
+        Lua Pre-function Plugin:
+          path:gsub("^/api/gateway/owners", "/owners")
+          → /api/gateway/owners/3 を /owners/3 に書き換え
+                ↓
+        OpenTelemetry Plugin:
+          - W3C Trace Context を注入 (Traceparent header)
+          - Kong span を OTel Collector へエクスポート
+                ↓
+        Customers Service (Port 8081)
+          Receives: GET /owners/3
+                ↓
+        OTel Java Agent (Auto-instrumentation):
+          - Trace Context を抽出
+          - Service span を作成
+          - OTel Collector へエクスポート
+                ↓
+        Owner データ (JSON) を返却
+                ↓
+        Kong API Gateway
+          → Browser (Angular SPA) へレスポンス
+                ↓
+    Browser で Owner 情報を表示
+```
+
+#### 3. Splunk Observability Cloud での可視化
+
+```
+OTel Collector が受信したトレース:
+  Kong span + Customers Service span
+                ↓
+  Splunk Observability Cloud へエクスポート
+                ↓
+    APM: 完全なトレース可視化 (Kong → Customers)
+    Service Map: サービス間依存関係の可視化
+    Metrics: レイテンシ、エラー率などのパフォーマンス指標
+```
+
+---
+
+## 🧩 主要コンポーネント
+
+### Kong API Gateway
+
+**役割**: API管理とルーティング
+
+**主要機能**:
+- **Kubernetes Ingress Controller**: Kubernetesネイティブな設定管理
+- **Lua Pre-function Plugin**: 高度なパス書き換え
+  - `/api/gateway/owners/**` → `/owners/**`
+  - `/api/gateway/pets/**` → `/pets/**`
+  - `/api/gateway/visits/**` → `/visits/**`
+- **OpenTelemetry Plugin**: 分散トレーシング
+  - W3C Trace Context propagation
+  - Baggage propagation
+  - OTLP export to Splunk OTel Collector
+- **CORS Plugin**: クロスオリジンリクエストサポート
+
+**デプロイ方式**: Helm Chart (NodePort service)
+
+### Splunk OpenTelemetry Collector
+
+**役割**: テレメトリーデータの収集と転送
+
+**デプロイ形態**:
+- **DaemonSet**: 各ノードで実行
+- **Operator**: 自動計装の管理
+
+**自動計装**:
+- **Java services**: OpenTelemetry Java Agent
+  - 環境変数設定なしで自動計装
+  - Annotation: `instrumentation.opentelemetry.io/inject-java: "default/splunk-otel-collector"`
+- **Python services**: OpenTelemetry Python Agent
+  - Annotation: `instrumentation.opentelemetry.io/inject-python: "default/splunk-otel-collector"`
+
+**データフロー**:
+```
+Application → OTel Agent (Init Container) → OTel Collector (Agent) → Splunk Observability Cloud
+```
+
+### Frontend Service (Angular SPA)
+
+**役割**: Web UIの提供
+
+**機能**:
+- 静的ファイル配信（HTML/JS/CSS）
+- Angular SPAからのAPIリクエストはKong経由でバックエンドへ
+- Spring Cloud Gatewayは `/api/gateway/**` のルーティングを行わない（Kongが直接処理）
+
+**アクセスパス**:
+- Web UI: `http://<NLB>:30080/`
+- Angular SPAが使用するAPI: `/api/gateway/**`
+
+### Business Services
+
+#### Customers Service (Port 8081)
+- ペットオーナーとペット情報の管理
+- Endpoints: `/owners`, `/petTypes`, `/pets`
+
+#### Visits Service (Port 8082)
+- 獣医診察記録の管理
+- Endpoints: `/visits`
+
+#### Vets Service (Port 8083)
+- 獣医師情報の管理
+- Endpoints: `/vets`
+
+#### GenAI Python Service (Port 8085)
+- AI チャット機能（FastAPI + LangChain）
+- OpenAI API統合
+- Endpoints: `/chatclient`, `/health`, `/info`
+
+#### Admin Server (Port 9090)
+- Spring Boot Admin による監視
+- Endpoint: `/admin`
+
+### Infrastructure Services
+
+#### Config Server (Port 8888)
+- Spring Cloud Config による設定管理
+
+#### Discovery Server (Port 8761)
+- Eureka サービスレジストリ
+
+---
 
 ## 🔧 前提条件
 
 ### 必要なツール
-- **Kubernetes**: k3s、k8s、または任意の Kubernetes クラスター (v1.24+)
+
+- **Kubernetes**: k3s、k8s、または任意のKubernetesクラスター (v1.24+)
 - **kubectl**: Kubernetes CLI ツール
-- **Helm**: Kubernetes 用パッケージマネージャー (v3.0+)
+- **Helm**: Kubernetes パッケージマネージャー (v3.0+)
 - **Git**: バージョン管理
-- **Docker**: Python版GenAI Serviceのビルドに必要
+- **Docker**: Python版GenAI Serviceのビルドに必要（オプション）
 
-### Docker権限の設定（重要）
+### システム要件
 
-Python版GenAI Serviceをビルドする場合、一般ユーザーがdockerコマンドを実行できる必要があります。
+推奨スペック（OpenTelemetry Agent含む）:
+- **メモリ**: 16GB 以上
+- **CPU**: 4コア 以上
+- **ディスク**: 20GB 以上
+
+> **注意**: OpenTelemetry Java/Python Agentは追加のメモリ・CPUリソースを消費します。
+> 各アプリケーションPodのメモリ制限は1.5GB、リクエストは1GBに設定されています。
+
+### Docker権限の設定（Python GenAI Serviceをビルドする場合）
 
 ```bash
 # 現在のユーザーをdockerグループに追加
 sudo usermod -aG docker $USER
 
-# 設定を反映（以下のいずれか）
-# 方法1: セッション再ログイン（推奨）
+# セッション再ログイン（推奨）
 exit
 # SSH/ターミナルに再接続
 
-# 方法2: 新しいグループセッションを開始
+# または新しいグループセッションを開始
 newgrp docker
 
-# 確認: dockerコマンドがsudoなしで実行できることを確認
+# 確認
 docker ps
 docker images
 ```
 
-**注意**: dockerグループへの追加は、rootユーザーと同等の権限を付与することになります。セキュリティ上のリスクを理解した上で実施してください。
+**注意**: dockerグループへの追加は、rootユーザーと同等の権限を付与します。セキュリティリスクを理解した上で実施してください。
 
-### システム要件
+### Helm設定
 
-**⚠️ OpenTelemetry 自動計装を有効化しているため、リソース要件が増加しています。**
-
-- **メモリ**: 最低 8GB RAM (**16GB 以上を強く推奨**)
-- **CPU**: 4+ コア (8+ コア推奨)
-- **ディスク**: 10GB 以上の空き容量
-
-#### リソース配分の内訳
-
-各アプリケーション Pod のリソース制限：
-
-| サービス | メモリ Limit | CPU Limit | メモリ Request | CPU Request |
-|---------|-------------|-----------|---------------|-------------|
-| 通常サービス | 1Gi | 1 core | 512Mi | 500m |
-| Frontend | 1.5Gi | 2 cores | 1Gi | 1 core |
-
-**注意**: OpenTelemetry Java Agent により、通常時より約 300-500MB のメモリ追加が必要です。
-
-### 前提条件の確認
+k3sを使用している場合、Helmが正しくKubernetesクラスターにアクセスできるよう設定します：
 
 ```bash
-# Kubernetes の確認
-kubectl version --client
+# KUBECONFIG環境変数を設定
+export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 
-# Helm の確認
+# .bashrcに追加（永続化）
+echo 'export KUBECONFIG=/etc/rancher/k3s/k3s.yaml' >> ~/.bashrc
+source ~/.bashrc
+
+# 確認
 helm version
-
-# クラスター接続の確認
-kubectl cluster-info
+kubectl get nodes
 ```
 
-## 🚀 クイックスタート
+### 外部サービスの準備
+
+#### 1. Splunk Observability Cloud
+
+**必須**: メトリクス・トレース・ログを収集するため
+
+1. Splunk Observability Cloudアカウントを作成: https://www.splunk.com/en_us/download/o11y-cloud-free-trial.html
+2. 以下の情報を取得:
+   - **Access Token**: Settings → Access Tokens → Create New Token
+   - **Realm**: Profile → Organization Settings → Realm (例: `us1`, `us2`, `eu0`, `jp0`)
+
+#### 2. OpenAI API Key（AI チャット機能を使用する場合）
+
+1. OpenAIアカウントを作成: https://platform.openai.com/
+2. API Keyを作成: API Keys → Create new secret key
+3. APIキーをコピー（形式: `sk-...`）
+
+---
+
+## 🚀 セットアップ手順
 
 ### 1. リポジトリのクローン
 
@@ -248,917 +355,570 @@ git clone https://github.com/knakagami/o11y-kong-petclinic.git
 cd o11y-kong-petclinic
 ```
 
-### 2. マイクロサービスのデプロイ
+### 2. Kubernetes Secretsの作成
+
+#### 2.1 Splunk Observability Cloud用Secret
+
+OpenTelemetry Collectorの設定ファイルをコピーして編集:
 
 ```bash
-# スクリプトに実行権限を付与
-chmod +x scripts/*.sh
+# user-values.yamlのテンプレートをコピー
+cd otel
+cp user-values-template.yaml user-values.yaml
 
-# すべての Spring PetClinic サービスをデプロイ
+# 編集: Access TokenとRealmを設定
+nano user-values.yaml  # または vi, vim, code など
+```
+
+`user-values.yaml` の内容:
+
+```yaml
+# Splunk Observability Cloud connection settings
+splunkObservability:
+  accessToken: "YOUR_SPLUNK_ACCESS_TOKEN_HERE"  # ← ここにAccess Tokenを設定
+  realm: "us1"  # ← ここにRealmを設定（例: us1, us2, eu0, jp0）
+  
+  # Optional: Enable additional features
+  profilingEnabled: false
+  secureAppEnabled: false
+
+# Cluster identification
+clusterName: "o11y-kong-petclinic-cluster"  # ← クラスター名を変更可能
+environment: "production"  # ← 環境名を変更可能
+
+# Optional: Splunk Platform (Enterprise/Cloud) integration
+# Uncomment if you want to send logs to Splunk Platform
+# splunkPlatform:
+#   endpoint: "https://your-splunk-instance:8088/services/collector"
+#   token: "YOUR_HEC_TOKEN_HERE"
+#   index: "main"
+#   source: "kubernetes"
+#   sourcetype: "_json"
+#   insecureSkipVerify: false
+```
+
+> **重要**: `user-values.yaml` は `.gitignore` に含まれており、誤ってコミットされることはありません。
+
+#### 2.2 GenAI Service用Secret（AI チャット機能を使用する場合）
+
+```bash
+# OpenAI API Keyを含むSecretを作成
+kubectl create namespace petclinic
+
+kubectl create secret generic genai-secrets \
+  --from-literal=openai-api-key=YOUR_OPENAI_API_KEY_HERE \
+  -n petclinic
+
+# 確認
+kubectl get secret genai-secrets -n petclinic
+kubectl describe secret genai-secrets -n petclinic
+```
+
+**代替方法（YAMLファイルから作成）**:
+
+```bash
+# secret.yaml を作成（注意: このファイルはGitにコミットしないこと）
+cat << EOF > /tmp/genai-secrets.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: genai-secrets
+  namespace: petclinic
+type: Opaque
+stringData:
+  openai-api-key: "YOUR_OPENAI_API_KEY_HERE"
+EOF
+
+kubectl apply -f /tmp/genai-secrets.yaml
+rm /tmp/genai-secrets.yaml  # 作成後は削除
+```
+
+### 3. Python GenAI Serviceのビルド（オプション）
+
+Python版GenAI Serviceを使用する場合、Dockerイメージをビルドします：
+
+```bash
+cd genai-python
+
+# Dockerイメージをビルド
+docker build -t genai-python:latest .
+
+# k3sにイメージをインポート（k3s使用時）
+docker save genai-python:latest | sudo k3s ctr images import -
+
+# 確認
+sudo k3s ctr images ls | grep genai-python
+
+cd ..
+```
+
+詳細は [genai-python/README.md](genai-python/README.md) を参照してください。
+
+---
+
+## 📦 デプロイ手順
+
+### ステップ1: マイクロサービスのデプロイ
+
+すべてのSpring Bootマイクロサービスとフロントエンドをデプロイします：
+
+```bash
 ./scripts/deploy-services.sh
 ```
 
 このスクリプトは以下を実行します：
-1. `petclinic` namespace の作成
-2. Config Server のデプロイと起動待機
-3. Discovery Server (Eureka) のデプロイ
-4. すべてのビジネスサービスを並行デプロイ
-5. Admin Server のデプロイ
-6. Frontend (Web UI) のデプロイ
+1. `petclinic` namespaceの作成
+2. Config Serverのデプロイ（設定管理）
+3. Discovery Serverのデプロイ（Eureka）
+4. ビジネスサービスのデプロイ（customers, visits, vets, genai, genai-python）
+5. Admin Serverのデプロイ（監視）
+6. Frontend（Angular SPA）のデプロイ
 
-### 3. Kong API Gateway のデプロイ
+**デプロイ時間**: 約5-10分（イメージのダウンロードと起動を含む）
+
+### ステップ2: Kong API Gatewayのデプロイ
+
+Kong Gatewayとルーティングルールをデプロイします：
 
 ```bash
-# Ingress Controller 付き Kong Gateway をデプロイ
 ./scripts/deploy-kong.sh
 ```
 
 このスクリプトは以下を実行します：
-1. Kong Helm リポジトリの追加
-2. カスタム値を使用した Helm による Kong のインストール
-3. ルーティング用 Kong Ingress リソースの適用
-4. プラグイン（CORS、レート制限、Prometheus）の設定
+1. Kong Helmリポジトリの追加
+2. `kong` namespaceの作成
+3. Kong Gateway + Ingress ControllerのHelmインストール
+4. Ingress資源とプラグイン設定の適用
+   - Lua Pre-functionプラグイン（パス書き換え）
+   - OpenTelemetryプラグイン（トレース伝搬）
+   - CORSプラグイン
 
-### 4. デプロイの確認
+**デプロイ時間**: 約2-3分
+
+### ステップ3: OpenTelemetry Collectorのデプロイ
+
+Splunk OpenTelemetry CollectorとOperatorをデプロイします：
 
 ```bash
-# すべての Pod が実行中であることを確認
+cd otel
+./deploy-otel.sh
+```
+
+このスクリプトは以下を実行します：
+1. cert-managerのインストール（Operator用）
+2. Splunk OTel Collector Helmリポジトリの追加
+3. `values.yaml` と `user-values.yaml` をマージしてインストール
+4. Collector Agentの起動（DaemonSet）
+5. Operatorの起動（自動計装管理）
+
+**デプロイ時間**: 約3-5分
+
+詳細は [otel/README.md](otel/README.md) を参照してください。
+
+### ステップ4: デプロイの確認
+
+すべてのPodが`Running`状態になるまで待ちます：
+
+```bash
+# Petclinic サービスの確認
 kubectl get pods -n petclinic
 
-# サービスの確認
-kubectl get services -n petclinic
-
-# Kong Pod の確認
+# Kong Gatewayの確認
 kubectl get pods -n kong
 
-# Ingress リソースの確認
+# OpenTelemetry Collectorの確認
+kubectl get pods -n default -l app=splunk-otel-collector
+
+# すべてのIngressの確認
 kubectl get ingress -n petclinic
+
+# すべてのサービスの確認
+kubectl get svc -A
 ```
 
-## 🌐 Web UI & API エンドポイント
+**期待される出力（petclinic namespace）**:
+```
+NAME                             READY   STATUS    RESTARTS   AGE
+admin-server-xxxxxxxxxx-xxxxx    1/1     Running   0          5m
+config-server-xxxxxxxxxx-xxxxx   1/1     Running   0          6m
+customers-service-xxx-xxxxx      1/1     Running   0          4m
+discovery-server-xxx-xxxxx       1/1     Running   0          5m
+frontend-xxxxxxxxxx-xxxxx        1/1     Running   0          3m
+genai-python-xxxxxxxxxx-xxxxx    1/1     Running   0          3m
+genai-service-xxxxxxxxxx-xxxxx   1/1     Running   0          3m
+vets-service-xxxxxxxxxx-xxxxx    1/1     Running   0          4m
+visits-service-xxxxxxxxxx-xxxxx  1/1     Running   0          4m
+```
 
-### 🖥️ Web UI（ブラウザからアクセス）
+---
 
-Spring PetClinicのAngular製Web UIにブラウザからアクセスできます：
+## 🌐 アクセス方法
+
+### Web UI（ブラウザから）
+
+Spring PetClinicのAngular製Web UIにアクセス：
 
 ```
-http://<NLB-DNS>:30080/
-または
 http://<k3s-node-ip>:30080/
+または
+http://<NLB-DNS>:30080/  （AWS NLB使用時）
 ```
 
-**Web UIの機能:**
-- ペットオーナーの登録・検索・編集
-- ペット情報の管理
-- 獣医師の一覧表示
-- 診察記録の登録・閲覧
+**Web UIの機能**:
+- 🔍 **FIND OWNERS**: ペットオーナーの検索・一覧
+- ✏️ **Owner Details**: オーナー情報の表示・編集
+- 🐾 **Add New Pet**: ペットの追加
+- 👨‍⚕️ **VETERINARIANS**: 獣医師の一覧
+- 💬 **AI Chat**: AIチャットボット（画面右下のアイコン）
 
-### Kong Gateway 経由（NodePort + AWS NLB）
+### API エンドポイント（curl / Postmanから）
 
-すべての API は Kong Gateway 経由でアクセス可能です：
-- **AWS NLB経由**: `http://<NLB-DNS>:30080` (NLB → k3s NodePort 30080)
-- **ローカル（k3sノード上）**: `http://localhost:30080` または `http://<k3s-node-ip>:30080`
+Kong Gateway経由でAPIにアクセス：
 
-> **注意:** Kong Gatewayは`NodePort`サービスとして動作し、AWS NLBが外部からのリクエストを受け付けます。
-> - 外部アクセス: NLBのポート30080/30443/30081を使用
-> - 内部アクセス: k3sノードのNodePort 30080/30443/30081を使用（同じポート番号）
+**ベースURL**:
+```
+http://localhost:30080  （k3sノード上から）
+http://<NLB-DNS>:30080  （AWS NLB経由）
+```
 
 #### Customers Service
 
 ```bash
-# すべての顧客を一覧表示
-GET http://localhost:30080/api/customer/owners
+# すべてのオーナーを一覧表示
+curl http://localhost:30080/api/customer/owners
 
-# ID で顧客を取得
-GET http://localhost:30080/api/customer/owners/{ownerId}
+# ID でオーナーを取得
+curl http://localhost:30080/api/customer/owners/3
 
-# 新しい顧客を作成
-POST http://localhost:30080/api/customer/owners
-Content-Type: application/json
-{
-  "firstName": "太郎",
-  "lastName": "山田",
-  "address": "東京都渋谷区1-2-3",
-  "city": "東京",
-  "telephone": "0312345678"
-}
-
-# 姓で顧客を検索
-GET http://localhost:30080/api/customer/owners/*/lastname/{lastName}
+# 新しいオーナーを作成
+curl -X POST http://localhost:30080/api/customer/owners \
+  -H "Content-Type: application/json" \
+  -d '{
+    "firstName": "太郎",
+    "lastName": "山田",
+    "address": "東京都渋谷区1-2-3",
+    "city": "東京",
+    "telephone": "0312345678"
+  }'
 
 # ペットタイプを取得
-GET http://localhost:30080/api/customer/petTypes
+curl http://localhost:30080/api/customer/petTypes
 ```
 
 #### Visits Service
 
 ```bash
 # ペットの診察記録を取得
-GET http://localhost:30080/api/visit/owners/*/pets/{petId}/visits
+curl http://localhost:30080/api/visit/owners/3/pets/4/visits
 
 # 新しい診察記録を作成
-POST http://localhost:30080/api/visit/owners/*/pets/{petId}/visits
-Content-Type: application/json
-{
-  "date": "2024-01-15",
-  "description": "定期健診"
-}
+curl -X POST http://localhost:30080/api/visit/owners/3/pets/4/visits \
+  -H "Content-Type: application/json" \
+  -d '{
+    "date": "2024-01-15",
+    "description": "定期健診"
+  }'
 ```
 
 #### Vets Service
 
 ```bash
 # すべての獣医師を一覧表示
-GET http://localhost:30080/api/vet/vets
+curl http://localhost:30080/api/vet/vets
 ```
 
-#### GenAI Service（Java版）
+#### GenAI Python Service
 
 ```bash
-# チャットボットAPI
-POST http://localhost:30080/api/genai/chatclient
-Content-Type: text/plain
-
-飼い主を全員教えてください
-```
-
-#### GenAI Python Service ✨
-
-```bash
-# チャットボットAPI（Python版）
-POST http://localhost:30080/api/genai-python/chatclient
-Content-Type: text/plain
-
-獣医師を全員教えてください
+# AIチャットボット
+curl -X POST http://localhost:30080/api/genai/chatclient \
+  -H "Content-Type: text/plain" \
+  -d "飼い主を全員教えてください"
 
 # サービス情報
-GET http://localhost:30080/api/genai-python/info
+curl http://localhost:30080/api/genai-python/info
 
 # ヘルスチェック
-GET http://localhost:30080/api/genai-python/health
+curl http://localhost:30080/api/genai-python/health
 ```
 
 #### Admin Server
 
 ```bash
 # Spring Boot Admin UI にアクセス
-GET http://localhost:30080/admin
+curl http://localhost:30080/admin
+
+# または ブラウザで開く
+open http://localhost:30080/admin
 ```
-
-### curl コマンド例
-
-```bash
-# すべての獣医師を取得
-curl http://localhost:30080/api/vet/vets
-
-# すべてのペットタイプを取得
-curl http://localhost:30080/api/customer/petTypes
-
-# すべてのオーナーを取得
-curl http://localhost:30080/api/customer/owners
-
-# 新しいオーナーを作成
-curl -X POST http://localhost:30080/api/customer/owners \
-  -H "Content-Type: application/json" \
-  -d '{
-    "firstName": "花子",
-    "lastName": "佐藤",
-    "address": "大阪府大阪市北区4-5-6",
-    "city": "大阪",
-    "telephone": "0667890123"
-  }'
-```
-
-## 🐍 GenAI Python Service
-
-このプロジェクトには、FastAPIとLangChainを使用したPython実装のGenAI Serviceが含まれています。
-
-### 主な機能
-
-- **会話型AIチャットボット**: OpenAI / Azure OpenAI GPTモデル使用
-- **Function Calling**: 飼い主/ペット管理、獣医師検索
-- **RAG機能**: Chromaベクターストアによる獣医師データの意味検索
-- **会話履歴**: 10メッセージまでのコンテキスト保持
-
-### ローカルビルドとデプロイ
-
-#### 1. Dockerイメージのビルド
-
-```bash
-cd genai-python
-chmod +x build-docker.sh
-./build-docker.sh
-```
-
-#### 2. k3sへのイメージインポート
-
-```bash
-# イメージをk3sにインポート
-docker save genai-python:latest | sudo k3s ctr images import -
-```
-
-#### 3. OpenAI APIキーの設定
-
-```bash
-# Kubernetes Secretとして設定
-kubectl create secret generic genai-secrets \
-  --from-literal=openai-api-key="sk-your-api-key-here" \
-  -n petclinic
-
-# または、deploymentの環境変数を直接編集
-kubectl edit deployment genai-python -n petclinic
-```
-
-#### 4. デプロイ
-
-```bash
-# GenAI Python Serviceのみデプロイ
-kubectl apply -f k8s/genai-python/
-
-# または、全サービス一括デプロイ（スクリプト使用）
-./scripts/deploy-services.sh
-```
-
-#### 5. 動作確認
-
-```bash
-# Pod状態確認
-kubectl get pods -n petclinic -l app=genai-python
-
-# ログ確認
-kubectl logs -f deployment/genai-python -n petclinic
-
-# Kong経由でテスト
-curl -X POST http://localhost:30080/api/genai-python/chatclient \
-  -H "Content-Type: text/plain" \
-  -d "飼い主を全員教えてください"
-```
-
-### Java版との違い
-
-| 項目 | Java版 | Python版 |
-|-----|--------|---------|
-| フレームワーク | Spring Boot + Spring AI | FastAPI + LangChain |
-| ベクターストア | SimpleVectorStore | Chroma |
-| デプロイ | 公式イメージ使用 | ローカルビルド必須 |
-| ポート（K8s） | 8084 | 8085 |
-| Kong パス | `/api/genai` | `/api/genai-python` |
-| 起動時間 | 約120秒 | 約30秒 |
-
-### トラブルシューティング
-
-詳細なトラブルシューティング情報は [genai-python/README.md](genai-python/README.md) を参照してください。
-
----
-
-## 📦 デプロイの詳細
-
-### Namespace
-
-すべての PetClinic リソースは `petclinic` namespace にデプロイされ、Kong は `kong` namespace にデプロイされます。
-
-### リソース制限
-
-**⚠️ OpenTelemetry 自動計装対応のため、リソース制限を増やしています。**
-
-#### 通常サービス（customers, visits, vets, genai, config, discovery, admin, genai-python）
-
-```yaml
-resources:
-  limits:
-    memory: "1Gi"      # OpenTelemetry Agent 込み
-    cpu: "1"
-  requests:
-    memory: "512Mi"
-    cpu: "500m"
-```
-
-#### Frontend サービス
-
-```yaml
-resources:
-  limits:
-    memory: "1536Mi"   # 1.5Gi (より大きなメモリが必要)
-    cpu: "2"
-  requests:
-    memory: "1Gi"
-    cpu: "1"
-```
-
-**背景**: OpenTelemetry Java Agent は通常 300-500MB の追加メモリを消費するため、リソース制限を2倍に設定しています。
-
-### ヘルスチェック
-
-すべてのサービスには以下が含まれます：
-- **Liveness Probe**: Pod が生きていることを確認
-- **Readiness Probe**: Pod がトラフィックを受け入れる準備ができていることを確認
-
-プローブは Spring Boot Actuator の `/actuator/health` エンドポイントを使用します。
-
-### サービスの依存関係
-
-デプロイは依存関係を尊重して以下の順序で行われます：
-1. Config Server（依存関係なし）
-2. Discovery Server（Config Server に依存）
-3. ビジネスサービス（Config Server + Discovery Server に依存）
-4. Admin Server（Config Server + Discovery Server に依存）
-
-## 🔐 Kong Gateway 設定
-
-### NodePort + NLB構成
-
-Kong Gateway は Kubernetes NodePort を使用し、AWS NLB 経由で公開されています：
-
-| 層 | HTTP | HTTPS | Admin |
-|----|------|-------|-------|
-| **外部アクセス（NLB）** | 30080 | 30443 | 30081 |
-| **NodePort（k3s）** | 30080 | 30443 | 30081 |
-| **Kong内部** | 8000 | 8443 | 8001 |
-
-**アクセス方法:**
-```bash
-# NLB経由（外部から）- 推奨
-curl http://<NLB-DNS>:30080/api/vet/vets
-
-# NodePort経由（k3sノード上から）
-curl http://localhost:30080/api/vet/vets
-
-# Admin API（NLB経由）
-curl http://<NLB-DNS>:30081/status
-
-# Admin API（NodePort経由）
-curl http://localhost:30081/status
-```
-
-### AWS NLB設定ガイド
-
-#### 必要なNLBリスナーとターゲットグループ設定
-
-**注意**: この設定では、NLBのリスナーポートとターゲットグループのポートが同じです。
-
-| リスナー（外部） | ターゲットグループ（EC2） | 説明 |
-|----------------|------------------------|------|
-| TCP 30080 | 30080 | HTTPプロキシ |
-| TCP 30443 | 30443 | HTTPSプロキシ（オプション） |
-| TCP 30081 | 30081 | Admin API |
-
-#### 設定手順
-
-1. **ターゲットグループを作成（3つ）**
-
-   **HTTPプロキシ用:**
-   - プロトコル: TCP
-   - ポート: **30080** ← NodePort
-   - ターゲット: EC2インスタンス（k3sノード）
-   - ヘルスチェック: TCP 30080
-
-   **HTTPSプロキシ用（オプション）:**
-   - プロトコル: TCP
-   - ポート: **30443** ← NodePort
-   - ターゲット: EC2インスタンス（k3sノード）
-   - ヘルスチェック: TCP 30443
-
-   **Admin API用:**
-   - プロトコル: TCP
-   - ポート: **30081** ← NodePort
-   - ターゲット: EC2インスタンス（k3sノード）
-   - ヘルスチェック: TCP 30081
-
-2. **NLBリスナーを作成**
-   - リスナー1: ポート 30080 → HTTPプロキシ用ターゲットグループ
-   - リスナー2: ポート 30443 → HTTPSプロキシ用ターゲットグループ
-   - リスナー3: ポート 30081 → Admin API用ターゲットグループ
-
-#### セキュリティグループ設定
-
-EC2インスタンスのセキュリティグループで以下のポートを開放：
-```
-インバウンドルール:
-- TCP 30080 (NLBから) - HTTP Proxy
-- TCP 30443 (NLBから) - HTTPS Proxy (オプション)
-- TCP 30081 (NLBから) - Admin API
-```
-
-#### 確認手順
-
-```bash
-# Kong ServiceがNodePortで動作しているか確認
-kubectl get svc -n kong
-
-# 期待される出力:
-# NAME                  TYPE       CLUSTER-IP      EXTERNAL-IP   PORT(S)
-# kong-gateway-proxy    NodePort   10.x.x.x        <none>        8000:30080/TCP,8443:30443/TCP
-# kong-gateway-admin    NodePort   10.x.x.x        <none>        8001:30081/TCP
-
-# NodePort経由でローカルからアクセスできるか確認
-curl http://localhost:30080
-curl http://localhost:30081/status
-```
-
-### Ingress リソース
-
-Kong ルートは Kubernetes Ingress リソースを使用して設定されます：
-
-```yaml
-/                   → frontend:8080 (Web UI - Angular SPA)
-/api/customer/*     → customers-service:8081
-/api/visit/*        → visits-service:8082
-/api/vet/*          → vets-service:8083
-/api/genai/*        → genai-service:8084
-/api/genai-python/* → genai-python:8085
-/admin/*            → admin-server:9090
-```
-
-> **注意:** `/` (ルートパス) はWeb UIを提供し、`/api/*` パスは各バックエンドサービスにルーティングされます。
-
-### プラグイン
-
-以下の Kong プラグインが設定されています：
-
-#### OpenTelemetry（グローバル） ✨ **NEW**
-- **目的**: 分散トレーシングとトレースコンテキスト伝搬
-- **エンドポイント**: `http://splunk-otel-collector-agent.default.svc.cluster.local:4318/v1/traces`
-- **トレース形式**: W3C Trace Context（`traceparent`, `tracestate`）
-- **伝搬方式**: W3C + B3（抽出と注入）
-- **サンプリングレート**: 100%（すべてのリクエストをトレース）
-- **効果**:
-  - Kong Gateway がトレーススパンを生成
-  - フロントエンド → Kong → バックエンドのエンドツーエンドトレース
-  - 完全なサービス依存関係マップ
-
-#### レート制限
-- 制限: クライアントあたり毎分 100 リクエスト
-- ポリシー: ローカル（インメモリ）
-
-#### CORS（グローバル）
-- オリジン: `*`（すべてのオリジンを許可）
-- メソッド: GET、POST、PUT、DELETE、PATCH、OPTIONS
-- 資格情報: 有効
-
-#### Prometheus
-- Kong のメトリクスエンドポイントでメトリクスを公開
-- すべてのサービスのリクエスト/レスポンスメトリクスを収集
 
 ### Kong Admin API
 
-`http://localhost:30081` で Kong Admin API にアクセス：
+Kong Gatewayの設定を確認：
 
 ```bash
-# Kong ステータスを確認
-curl http://localhost:30081/status
+# Port-forward でKong Admin APIにアクセス
+kubectl port-forward -n kong service/kong-gateway-admin 8001:8001
 
-# すべてのサービスを一覧表示
-curl http://localhost:30081/services
+# ルート一覧を確認
+curl http://localhost:8001/routes | jq '.data[] | {name, paths}'
 
-# すべてのルートを一覧表示
-curl http://localhost:30081/routes
+# サービス一覧を確認
+curl http://localhost:8001/services | jq '.data[] | {name, host, port}'
 
-# メトリクスを表示
-curl http://localhost:30081/metrics
+# プラグイン一覧を確認
+curl http://localhost:8001/plugins | jq '.data[] | {name, enabled}'
 ```
-
-## 🔭 オブザーバビリティ（OpenTelemetry）
-
-このプロジェクトでは、**Splunk Distribution of OpenTelemetry Collector** を使用して、Kubernetesクラスターとアプリケーションの包括的なオブザーバビリティを実現できます。
-
-### 概要
-
-OpenTelemetry Collector を導入することで、以下のテレメトリデータを自動的に収集できます：
-
-- **📊 メトリクス**: Kubernetesクラスター、ノード、Pod、コンテナのメトリクス
-- **📝 ログ**: コンテナログとKubernetesイベント
-- **🔍 トレース**: 分散トレーシングデータ（APM）
-
-**送信先:**
-- **Splunk Observability Cloud**: リアルタイム監視、APM、Infrastructure Monitoring
-- **Splunk Platform** (Splunk Enterprise / Splunk Cloud): ログ分析、長期保存（オプション）
-
-### メリット
-
-- **統合可視性**: すべてのマイクロサービスとインフラを一元的に監視
-- **パフォーマンス分析**: レイテンシ、エラー率、スループットをリアルタイムで追跡
-- **トラブルシューティング**: ログ、メトリクス、トレースを相関させた高度な分析
-- **アラート**: 異常検知とカスタムアラートの設定
-
-### セットアップ
-
-#### 前提条件
-
-- Splunk Observability Cloud アカウント
-- アクセストークン（Ingest Token）
-
-#### デプロイ手順
-
-詳細な手順は **[otel/README.md](otel/README.md)** を参照してください。
-
-**クイックスタート:**
-
-```bash
-# 1. テンプレートから user-values.yaml を作成
-cd otel
-cp user-values-template.yaml user-values.yaml
-
-# 2. user-values.yaml を編集して実際の値を設定
-vi user-values.yaml
-
-# 必須項目:
-# - splunkObservability.accessToken: Splunk Observability Cloud のアクセストークン
-# - splunkObservability.realm: あなたのレルム（例: us1, us0, eu0, jp0）
-# - clusterName: クラスター名
-# - environment: 環境名
-
-# オプション: Splunk Platform への送信も設定する場合
-# - splunkPlatform.token: HEC Token
-# - splunkPlatform.endpoint: HEC Endpoint URL
-# - splunkPlatform.index: インデックス名
-
-# 3. OpenTelemetry Collector をデプロイ
-cd ..
-chmod +x otel/deploy-otel.sh
-./otel/deploy-otel.sh
-
-# 4. デプロイを確認
-kubectl get pods -n splunk-otel
-```
-
-#### 設定ファイル
-
-| ファイル | 説明 |
-|---------|------|
-| `otel/values.yaml` | 基本設定（環境非依存）<br>- Operator有効化<br>- Tolerations設定<br>- ログ収集設定 |
-| `otel/user-values-template.yaml` | 環境固有設定のテンプレート<br>- Splunk Observability Cloud接続情報<br>- Splunk Platform接続情報（オプション） |
-| `otel/user-values.yaml` | **⚠️ 作成必須**（.gitignoreで除外）<br>テンプレートからコピーして実際の値を設定 |
-| `otel/deploy-otel.sh` | デプロイ自動化スクリプト |
-
-**⚠️ 重要**: 
-1. **`otel/user-values-template.yaml` を `user-values.yaml` にコピー**
-2. **`user-values.yaml` を編集**して実際のアクセストークン、レルム、HECトークン（使用する場合）を設定
-3. **`user-values.yaml` は `.gitignore` に追加されており、Gitにコミットされません**（安全）
-
-### アプリケーションの自動計装
-
-**OpenTelemetry Operator** により、アプリケーションコードを変更せずに自動的にトレーシングが有効化されます。
-
-#### 仕組み
-
-すべてのアプリケーション Deployment に以下のアノテーションが追加されています：
-
-```yaml
-# Java アプリケーション用
-annotations:
-  instrumentation.opentelemetry.io/inject-java: "default/splunk-otel-collector"
-
-# Python アプリケーション用
-annotations:
-  instrumentation.opentelemetry.io/inject-python: "default/splunk-otel-collector"
-```
-
-これにより、Operator が自動的に：
-1. **Init Container を注入**: OpenTelemetry SDK とエージェントをダウンロード
-2. **環境変数を設定**: OTLP エンドポイント、サービス名などを自動設定
-3. **自動計装を有効化**: アプリケーション起動時に Java Agent / Python Agent を注入
-
-#### 対象サービス
-
-| サービス | 言語 | 自動計装 |
-|---------|------|----------|
-| customers-service | Java | ✅ |
-| visits-service | Java | ✅ |
-| vets-service | Java | ✅ |
-| genai-service | Java | ✅ |
-| config-server | Java | ✅ |
-| discovery-server | Java | ✅ |
-| admin-server | Java | ✅ |
-| frontend | Java | ✅ |
-| genai-python | Python | ✅ |
-
-### Kong Gateway でのトレース伝搬
-
-**Kong OpenTelemetry プラグイン**が有効化されており、Kong Gateway を経由するリクエストのトレースコンテキストが正しく伝搬されます。
-
-#### 設定内容
-
-```yaml
-# KongClusterPlugin: global-opentelemetry
-config:
-  endpoint: "http://splunk-otel-collector-agent.default.svc.cluster.local:4318/v1/traces"
-  propagation:
-    default_format: "w3c"
-    extract: ["w3c", "b3"]
-    inject: ["w3c", "b3"]
-  sampling_rate: 1.0  # 100% サンプリング
-```
-
-#### 効果
-
-- ✅ Kong Gateway がトレーススパンを生成
-- ✅ `traceparent` / `tracestate` / `baggage` ヘッダーを自動的に伝搬
-- ✅ フロントエンド → Kong → バックエンドサービスのエンドツーエンドトレース
-- ✅ 完全なサービス依存関係マップ
-
-### Splunk Observability Cloud での確認
-
-デプロイ後、[Splunk Observability Cloud](https://login.signalfx.com/) で以下を確認できます：
-
-1. **Infrastructure Monitoring**
-   - Kubernetes Navigator で `petclinic-k3s` クラスターを表示
-   - Pod、Node、Container の詳細メトリクス
-
-2. **APM (Application Performance Monitoring)**
-   - **Service Map**: マイクロサービス間の依存関係を可視化
-     - `frontend` → `kong-gateway` → `customers-service` → `discovery-server`
-     - `frontend` → `kong-gateway` → `vets-service`
-     - `frontend` → `kong-gateway` → `visits-service`
-   - **Distributed Traces**: リクエストの完全なフローを追跡
-   - **Span Details**: 各サービスの処理時間とエラーを分析
-
-3. **Log Observer**
-   - コンテナログの検索と分析
-   - Kubernetesイベントの確認
-
-#### 期待される表示
-
-Service Map で以下のサービスが表示されるはずです：
-- `kong-gateway` (API Gateway)
-- `frontend` (Web UI)
-- `customers-service`
-- `visits-service`
-- `vets-service`
-- `genai-service`
-- `genai-python`
-- `config-server`
-- `discovery-server`
-- `admin-server`
-
-### トラブルシューティング
-
-#### OpenTelemetry Collector
-
-```bash
-# OpenTelemetry Collector のステータス確認
-kubectl get pods -n default | grep splunk-otel-collector
-
-# ログ確認
-kubectl logs -n default -l app.kubernetes.io/name=splunk-otel-collector --tail=50
-
-# アンインストール
-helm uninstall splunk-otel-collector -n default
-```
-
-#### 自動計装の確認
-
-```bash
-# Init Container が注入されているか確認
-kubectl describe pod <pod-name> -n petclinic | grep -A 5 "Init Containers"
-
-# OpenTelemetry Java Agent が起動しているか確認
-kubectl logs <pod-name> -n petclinic | grep -i "opentelemetry"
-
-# 環境変数が注入されているか確認
-kubectl exec <pod-name> -n petclinic -- env | grep OTEL
-```
-
-#### Kong OpenTelemetry プラグイン
-
-```bash
-# プラグインが作成されているか確認
-kubectl get kongclusterplugin -A
-
-# プラグインの詳細を確認
-kubectl describe kongclusterplugin global-opentelemetry
-
-# Kong のログでプラグインが動作しているか確認
-kubectl logs -n kong -l app.kubernetes.io/name=kong --tail=100 | grep -i opentelemetry
-
-# トレースヘッダーが伝搬されているか確認
-curl -v http://localhost:30080/api/vet/vets | grep -i "traceparent\|server-timing"
-```
-
-#### よくある問題と解決方法
-
-**1. Pod が CrashLoopBackOff（メモリ不足）**
-```bash
-# リソース使用状況を確認
-kubectl top pods -n petclinic
-
-# Pod のイベントを確認
-kubectl describe pod <pod-name> -n petclinic
-
-# 解決方法: リソース制限はすでに2倍に設定済み
-# それでも不足する場合は、さらに増やす必要があります
-```
-
-**2. トレースが繋がらない**
-```bash
-# Kong OpenTelemetry プラグインが有効か確認
-kubectl get kongclusterplugin global-opentelemetry
-
-# 自動計装アノテーションが正しいか確認
-kubectl get deployment -n petclinic -o yaml | grep "instrumentation.opentelemetry.io"
-
-# OTel Collector がトレースを受信しているか確認
-kubectl logs -n default -l app=splunk-otel-collector --tail=100 | grep -i trace
-```
-
-**3. Init Container が注入されない**
-```bash
-# Instrumentation リソースが存在するか確認
-kubectl get instrumentation -n default
-
-# Operator が動作しているか確認
-kubectl get pods -n default | grep opentelemetry-operator
-
-# Operator のログを確認
-kubectl logs -n default -l app.kubernetes.io/name=opentelemetry-operator --tail=50
-```
-
-詳細なトラブルシューティング情報は [otel/README.md](otel/README.md) を参照してください。
-
-## 📊 監視と可観測性
-
-### Spring Boot Admin
-
-Spring Boot Admin ダッシュボードにアクセス：
-
-```bash
-# Kong Gateway 経由
-http://localhost:30080/admin
-
-# 直接アクセス（クラスター内）
-http://admin-server.petclinic.svc.cluster.local:9090
-```
-
-### Eureka ダッシュボード
-
-Eureka で登録されたサービスを表示：
-
-```bash
-# Eureka UI にアクセスするためのポートフォワード
-kubectl port-forward -n petclinic svc/discovery-server 8761:8761
-
-# ブラウザで開く
-http://localhost:8761
-```
-
-### Kong メトリクス
-
-Kong は Prometheus メトリクスを公開します：
-
-```bash
-# メトリクスエンドポイントにアクセス
-curl http://localhost:30081/metrics
-```
-
-### サービスログ
-
-```bash
-# 特定のサービスのログを表示
-kubectl logs -f deployment/customers-service -n petclinic
-
-# Kong のログを表示
-kubectl logs -f deployment/kong-controller -n kong
-
-# namespace 内のすべてのログを表示
-kubectl logs -f -n petclinic --all-containers=true
-```
-
-## 🔍 トラブルシューティング
-
-### サービスが起動しない
-
-```bash
-# Pod のステータスを確認
-kubectl get pods -n petclinic
-
-# 問題のある Pod を詳しく確認
-kubectl describe pod <pod-name> -n petclinic
-
-# ログを確認
-kubectl logs <pod-name> -n petclinic
-```
-
-### Config Server の問題
-
-```bash
-# Config Server のログを確認
-kubectl logs deployment/config-server -n petclinic
-
-# Config Server にアクセス可能か確認
-kubectl exec -it deployment/customers-service -n petclinic -- \
-  curl http://config-server:8888/actuator/health
-```
-
-### Discovery Server の問題
-
-```bash
-# Eureka のログを確認
-kubectl logs deployment/discovery-server -n petclinic
-
-# ポートフォワードして UI を確認
-kubectl port-forward -n petclinic svc/discovery-server 8761:8761
-# http://localhost:8761 を開く
-```
-
-### Kong Gateway の問題
-
-```bash
-# Kong Pod のステータスを確認
-kubectl get pods -n kong
-
-# Kong のログを確認
-kubectl logs -f deployment/kong-controller -n kong
-
-# Kong の設定を確認
-kubectl get ingress -n petclinic
-kubectl get kongplugin -n petclinic
-```
-
-### ネットワーク接続
-
-```bash
-# サービス間通信をテスト
-kubectl exec -it deployment/customers-service -n petclinic -- \
-  curl http://discovery-server:8761/actuator/health
-
-# Kong からバックエンドサービスへのテスト
-kubectl exec -it -n kong deployment/kong-gateway -- \
-  curl http://customers-service.petclinic.svc.cluster.local:8081/actuator/health
-```
-
-### よくある問題
-
-1. **Pod が CrashLoopBackOff 状態**
-   - 依存サービス（Config/Discovery）が準備完了しているか確認
-   - リソース制限を超えていないか確認
-   - アプリケーションログを確認
-
-2. **Kong から 503 Service Unavailable**
-   - バックエンドサービスが実行中か確認
-   - Ingress 設定を確認
-   - サービスが Eureka に登録されているか確認
-
-3. **起動が遅い**
-   - サービスの完全起動には 2〜3 分かかる場合があります
-   - Readiness Probe が通過するまで待機
-   - リソース制約を確認
-
-## 🧹 クリーンアップ
-
-すべてのデプロイされたリソースを削除するには：
-
-```bash
-# クリーンアップスクリプトを実行
-./scripts/cleanup.sh
-
-# または手動で namespace を削除
-kubectl delete namespace petclinic
-kubectl delete namespace kong
-```
-
-## 📚 追加リソース
-
-- [Spring PetClinic Microservices](https://github.com/spring-petclinic/spring-petclinic-microservices)
-- [Kong Gateway ドキュメント](https://docs.konghq.com/)
-- [Kong Ingress Controller](https://docs.konghq.com/kubernetes-ingress-controller/)
-- [Spring Cloud ドキュメント](https://spring.io/projects/spring-cloud)
-
-## 🤝 コントリビューション
-
-コントリビューションを歓迎します！遠慮なく Pull Request を提出してください。
-
-## 📄 ライセンス
-
-このプロジェクトは Apache License 2.0 でライセンスされている Spring PetClinic をベースにしています。
-
-## 👥 作者
-
-- [Spring PetClinic Microservices](https://github.com/spring-petclinic/spring-petclinic-microservices) をベースにしています
-- Kong 統合と Kubernetes デプロイ設定は **Cursor AI** によって生成されました
-
-## 🤖 AI 生成コードについて
-
-このプロジェクトのすべてのコード、設定ファイル、デプロイメントスクリプトは **Cursor AI** によって自動生成されています。
-
-### 含まれるもの
-- Kubernetes マニフェスト（すべてのサービス）
-- Kong Gateway Helm 設定
-- デプロイメント自動化スクリプト
-- ドキュメント
-
-### 注意事項
-- ⚠️ AI 生成コードには予期しないバグや設定ミスが含まれる可能性があります
-- ⚠️ 本番環境で使用する前に、すべての設定を慎重に検証してください
-- ⚠️ セキュリティ設定、リソース制限、ネットワークポリシーを本番環境に合わせて調整してください
-- ⚠️ このプロジェクトはデモンストレーションと学習目的で提供されています
 
 ---
 
-**注意**: これはデモンストレーションプロジェクトです。本番環境で使用する場合は、以下を検討してください：
-- 認証と認可の追加
-- 適切なシークレット管理の実装
-- TLS/SSL 証明書の設定
-- 自動バックアップの設定
-- 適切な監視とアラートの実装
-- ステートフルサービス用の永続ストレージの使用
-- セキュリティスキャンとコンプライアンスチェック
-- リソース制限の調整とパフォーマンステスト
+## 📊 オブザーバビリティ
+
+### OpenTelemetry 自動計装
+
+#### Java Services
+
+すべてのSpring Bootサービスは、OpenTelemetry Java Agentで自動計装されています。
+
+**設定方法**:
+```yaml
+# k8s/*/deployment.yaml
+metadata:
+  annotations:
+    instrumentation.opentelemetry.io/inject-java: "default/splunk-otel-collector"
+```
+
+**効果**:
+- HTTP リクエスト/レスポンスの自動トレース
+- データベースクエリの自動トレース
+- JVM メトリクスの自動収集
+- トレースコンテキストの自動伝搬
+
+#### Python Services
+
+GenAI Python ServiceはOpenTelemetry Python Agentで自動計装されています。
+
+**設定方法**:
+```yaml
+# k8s/genai-python/deployment.yaml
+metadata:
+  annotations:
+    instrumentation.opentelemetry.io/inject-python: "default/splunk-otel-collector"
+```
+
+#### Spring Boot Zipkinの無効化
+
+OpenTelemetryに一本化するため、すべてのサービスでSpring Boot Zipkinを無効化しています：
+
+```yaml
+# k8s/*/deployment.yaml
+env:
+- name: MANAGEMENT_TRACING_ENABLED
+  value: "false"
+- name: MANAGEMENT_ZIPKIN_TRACING_ENDPOINT
+  value: ""
+```
+
+また、ConfigMapでも無効化：
+
+```yaml
+# k8s/*/configmap.yaml (例: frontend)
+management:
+  tracing:
+    enabled: false
+  zipkin:
+    tracing:
+      endpoint: ""
+
+spring.zipkin.enabled: false
+spring.sleuth.enabled: false
+```
+
+### Kong OpenTelemetry Plugin
+
+Kong GatewayはOpenTelemetryプラグインでトレースコンテキストを伝搬します。
+
+**設定**:
+```yaml
+# kong/kong-resources.yaml
+kind: KongClusterPlugin
+metadata:
+  name: global-opentelemetry
+config:
+  endpoint: "http://splunk-otel-collector-agent.default.svc.cluster.local:4318/v1/traces"
+  header_type: "w3c"
+  propagation:
+    default_format: "w3c"
+    extract: ["w3c", "b3", "jaeger"]
+    inject: ["w3c", "b3"]
+  sampling_rate: 1.0
+```
+
+**機能**:
+- W3C Trace Contextの抽出（リクエストから）
+- W3C Trace Contextの注入（バックエンドへ）
+- B3、Jaegerフォーマットのサポート
+- OTLPエクスポート（Splunk OTel Collectorへ）
+
+---
+
+## 🛠️ Kong Gateway 詳細設定
+
+### Lua Pre-function による パス書き換え
+
+Angular SPAからの `/api/gateway/**` リクエストは、Kong Lua Pre-functionプラグインで書き換えられます。
+
+**理由**:
+- Angular SPAは元々の Spring PetClinic の公式Dockerイメージを使用
+- Angular SPAのコードは `/api/gateway/**` パスにハードコードされている
+- ソースコードを修正せずに、Kongでパスを書き換える
+
+**実装例（/api/gateway/owners/** → /owners/**）**:
+
+```yaml
+# kong/kong-resources.yaml
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: rewrite-gateway-owners
+  namespace: petclinic
+plugin: pre-function
+config:
+  access:
+    - |
+      local path = kong.request.get_path()
+      local new_path = path:gsub("^/api/gateway/owners", "/owners")
+      kong.service.request.set_path(new_path)
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gateway-owners-ingress
+  namespace: petclinic
+  annotations:
+    konghq.com/plugins: rewrite-gateway-owners
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /api/gateway/owners
+        pathType: Prefix
+        backend:
+          service:
+            name: customers-service
+            port:
+              number: 8081
+```
+
+**フロー**:
+```
+1. Browser → /api/gateway/owners/3
+2. Kong Ingress Match: /api/gateway/owners
+3. Lua Pre-function:
+   path:gsub("^/api/gateway/owners", "/owners")
+   → /api/gateway/owners/3 → /owners/3
+4. Backend → customers-service:8081/owners/3
+```
+
+**パス書き換えルール**:
+| 元のパス (Angular SPA) | 書き換え後 (Backend) | Backend Service |
+|----------------------|---------------------|-----------------|
+| `/api/gateway/owners/**` | `/owners/**` | customers-service |
+| `/api/gateway/petTypes` | `/petTypes` | customers-service |
+| `/api/gateway/pets/**` | `/pets/**` | customers-service |
+| `/api/gateway/visits/**` | `/visits/**` | visits-service |
+| `/api/gateway/vets` | `/vets` | vets-service |
+
+### Ingress リソース一覧
+
+すべてのIngress リソース:
+
+```yaml
+# Frontend (Angular SPA)
+/                   → frontend:8080
+
+# Backend Services (Direct API)
+/api/customer/*     → customers-service:8081
+/api/visit/*        → visits-service:8082
+/api/vet/*          → vets-service:8083
+/api/genai/*        → genai-python:8085
+/api/genai-python/* → genai-python:8085
+/admin/*            → admin-server:9090
+
+# Angular SPA Routes (Lua Pre-function)
+/api/gateway/owners/**  → customers-service:8081 (/owners/**)
+/api/gateway/petTypes   → customers-service:8081 (/petTypes)
+/api/gateway/pets/**    → customers-service:8081 (/pets/**)
+/api/gateway/visits/**  → visits-service:8082 (/visits/**)
+/api/gateway/vets       → vets-service:8083 (/vets)
+```
+
+---
+
+## 🧹 クリーンアップ
+
+### 全リソースの削除
+
+```bash
+# OpenTelemetry Collectorの削除
+helm uninstall splunk-otel-collector -n default
+kubectl delete namespace cert-manager
+
+# Kong Gatewayの削除
+helm uninstall kong -n kong
+kubectl delete namespace kong
+
+# Petclinicサービスの削除
+kubectl delete namespace petclinic
+
+# 確認
+kubectl get pods -A
+```
+
+### 個別サービスの削除
+
+```bash
+# 特定のサービスのみ削除
+kubectl delete -f k8s/customers-service/
+kubectl delete -f k8s/genai-python/
+
+# または Deploymentのみ削除
+kubectl delete deployment customers-service -n petclinic
+```
+
+---
+
+## 📚 参考資料
+
+### プロジェクトドキュメント
+
+- [GenAI Python Service README](genai-python/README.md)
+- [OpenTelemetry Collector README](otel/README.md)
+
+### 外部リンク
+
+- [Spring PetClinic Microservices (オリジナル)](https://github.com/spring-petclinic/spring-petclinic-microservices)
+- [Kong Gateway Documentation](https://docs.konghq.com/gateway/latest/)
+- [Kong Ingress Controller](https://docs.konghq.com/kubernetes-ingress-controller/latest/)
+- [OpenTelemetry Documentation](https://opentelemetry.io/docs/)
+- [Splunk Observability Cloud](https://docs.splunk.com/Observability/)
+- [Splunk OpenTelemetry Collector](https://github.com/signalfx/splunk-otel-collector-chart)
+
+---
+
+## 📝 ライセンス
+
+このプロジェクトは Apache License 2.0 の下でライセンスされています。
+
+元のSpring PetClinicプロジェクトについては、[オリジナルリポジトリ](https://github.com/spring-petclinic/spring-petclinic-microservices)を参照してください。
+
+---
+
+## 🤝 コントリビューション
+
+Issue、Pull Request、フィードバックを歓迎します！
+
+---
+
+**Author**: Generated with Cursor AI  
+**Last Updated**: 2025-11-26
