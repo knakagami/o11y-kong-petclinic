@@ -39,14 +39,13 @@ spec:
         - name: VETS_SERVICE_URL
           value: "http://vets-service:8083"
         # OpenAI Configuration (required for GenAI features)
-        # Uncomment and set these environment variables or create a Secret
-        # - name: OPENAI_API_KEY
-        #   valueFrom:
-        #     secretKeyRef:
-        #       name: genai-secrets
-        #       key: openai-api-key
-        # - name: OPENAI_MODEL
-        #   value: "gpt-4o-mini"
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: genai-secrets
+              key: openai-api-key
+        - name: OPENAI_MODEL
+          value: "gpt-4o-mini"
         # Azure OpenAI Configuration (alternative to OpenAI)
         # - name: AZURE_OPENAI_KEY
         #   valueFrom:
