@@ -61,17 +61,17 @@ helm repo update
 print_message "$GREEN" "✓ Helm リポジトリが追加されました"
 echo ""
 
-# Step 2: Create namespace
-print_message "$YELLOW" "Step 2: splunk-otel namespace を作成..."
-kubectl create namespace splunk-otel --dry-run=client -o yaml | kubectl apply -f -
-print_message "$GREEN" "✓ Namespace が作成されました"
+# Step 2: Ensure default namespace exists
+print_message "$YELLOW" "Step 2: default namespace を確認..."
+kubectl get namespace default > /dev/null 2>&1
+print_message "$GREEN" "✓ Namespace default が存在します"
 echo ""
 
 # Step 3: Install/Upgrade Splunk OTel Collector
 print_message "$YELLOW" "Step 3: Splunk OTel Collector をデプロイ..."
 helm upgrade --install splunk-otel-collector \
     splunk-otel-collector-chart/splunk-otel-collector \
-    --namespace splunk-otel \
+    --namespace default \
     --values otel/values.yaml \
     --values otel/user-values.yaml \
     --wait \
@@ -84,7 +84,7 @@ echo ""
 print_message "$YELLOW" "Splunk OTel Collector Pods の起動を待機中..."
 kubectl wait --for=condition=ready pod \
     -l app.kubernetes.io/name=splunk-otel-collector \
-    -n splunk-otel \
+    -n default \
     --timeout=300s 2>/dev/null || true
 echo ""
 
@@ -95,11 +95,11 @@ print_message "$GREEN" "============================================"
 echo ""
 
 print_message "$BLUE" "Splunk OTel Pods:"
-kubectl get pods -n splunk-otel
+kubectl get pods -n default -l app.kubernetes.io/name=splunk-otel-collector
 echo ""
 
 print_message "$BLUE" "Splunk OTel Services:"
-kubectl get services -n splunk-otel
+kubectl get services -n default -l app.kubernetes.io/name=splunk-otel-collector
 echo ""
 
 print_message "$GREEN" "============================================"
@@ -109,15 +109,15 @@ echo ""
 
 print_message "$YELLOW" "次のステップ:"
 echo "1. Splunk Observability Cloud にログイン"
-echo "2. Infrastructure Monitoring で 'petclinic-k3s' クラスターを確認"
+echo "2. Infrastructure Monitoring でクラスターを確認"
 echo "3. APM でサービスマップとトレースを確認"
 echo "4. Log Observer でログを確認"
 echo ""
 
 print_message "$BLUE" "Useful commands:"
-echo "  - View OTel Collector logs: kubectl logs -n splunk-otel -l app.kubernetes.io/name=splunk-otel-collector --tail=50"
-echo "  - Check OTel status: kubectl get all -n splunk-otel"
-echo "  - Uninstall: helm uninstall splunk-otel-collector -n splunk-otel"
+echo "  - View OTel Collector logs: kubectl logs -n default -l app.kubernetes.io/name=splunk-otel-collector --tail=50"
+echo "  - Check OTel status: kubectl get all -n default -l app.kubernetes.io/name=splunk-otel-collector"
+echo "  - Uninstall: helm uninstall splunk-otel-collector -n default"
 echo ""
 
 print_message "$GREEN" "Setup complete! 🎉"

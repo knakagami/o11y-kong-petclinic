@@ -194,6 +194,25 @@ kubectl create secret generic genai-secrets \
       key: openai-api-key
 ```
 
+### OpenTelemetry自動計装
+
+このサービスはOpenTelemetry Operatorによって自動的に計装されます。
+
+Deployment YAMLに以下のアノテーションが設定されています:
+
+```yaml
+metadata:
+  annotations:
+    instrumentation.opentelemetry.io/inject-python: "default/splunk-otel-collector"
+```
+
+これにより、以下が自動的に実行されます:
+- OpenTelemetry Python Agentのインジェクション
+- 分散トレーシングの有効化
+- メトリクスとログの収集
+
+注意: 自動計装により、メモリとCPUのリソース使用量が増加します。
+
 ### デプロイ
 
 ```bash
@@ -246,69 +265,21 @@ curl -X POST http://genai-python:8085/chatclient \
 
 ## Kong経由でのアクセス
 
-Kong API Gatewayがデプロイされている場合：
+Kong API Gatewayがデプロイされている場合、以下のパスでアクセスできます:
 
 ```bash
-# Kong経由でアクセス
+# パターン1: /api/genai-python/
 curl -X POST http://<kong-proxy-ip>:30080/api/genai-python/chatclient \
+  -H "Content-Type: text/plain" \
+  -d "Show me all veterinarians"
+
+# パターン2: /api/genai/ (同じエンドポイント)
+curl -X POST http://<kong-proxy-ip>:30080/api/genai/chatclient \
   -H "Content-Type: text/plain" \
   -d "Show me all veterinarians"
 ```
 
-## トラブルシューティング
-
-### 1. ベクターストアの初期化に失敗する
-
-**症状**: "Failed to load vector store" エラー
-
-**解決策**:
-- vets-serviceが起動していることを確認
-- OpenAI APIキーが正しく設定されていることを確認
-- ネットワーク接続を確認
-
-### 2. OpenAI APIエラー
-
-**症状**: "Chat is currently unavailable" レスポンス
-
-**解決策**:
-- APIキーの有効性を確認
-- APIレート制限を確認
-- ログで詳細なエラーメッセージを確認
-
-```bash
-kubectl logs -f deployment/genai-python -n petclinic
-```
-
-### 3. 他のサービスに接続できない
-
-**症状**: HTTPエラー、接続タイムアウト
-
-**解決策**:
-- サービスが同じnamespace（petclinic）にデプロイされていることを確認
-- 環境変数が正しく設定されていることを確認
-- ネットワークポリシーを確認
-
-```bash
-kubectl get svc -n petclinic
-kubectl describe pod -n petclinic -l app=genai-python
-```
-
-### 4. Podが起動しない
-
-**症状**: CrashLoopBackOff、ImagePullBackOff
-
-**解決策**:
-- イメージがk3sにインポートされていることを確認
-- `imagePullPolicy: Never`が設定されていることを確認
-- リソース制限を確認
-
-```bash
-# イメージの確認
-sudo k3s crictl images | grep genai-python
-
-# イベント確認
-kubectl describe pod -n petclinic -l app=genai-python
-```
+どちらのパスも同じGenAI Python Serviceに転送されます。
 
 ## 開発
 
@@ -351,8 +322,10 @@ mypy app/
 
 ## 注意事項
 
-⚠️ このコードはAI（Cursor）によって生成されました。本番環境での使用前に十分なテストとレビューを行ってください。
+⚠️ このコードはAI（Cursor）によって生成されました。
 
+- **このプロジェクトはデモンストレーション・学習目的であり、商用利用は想定していません**
+- **本番環境での使用は推奨されません**
 - OpenAI APIの使用には料金が発生します
 - ベクターストアの初期化時に埋め込み生成が行われます（初回のみ）
 - 会話履歴はメモリ内に保持され、Pod再起動でリセットされます

@@ -9,17 +9,26 @@
 - `helm` がインストールされていること（v3.0+）
 - Splunk Observability Cloud のアカウントとアクセストークン
 
-## 🔑 アクセストークンの取得
-
-1. [Splunk Observability Cloud](https://login.signalfx.com/) にログイン
-2. Settings > Access Tokens に移動
-3. **New Token** をクリック
-4. トークン名を入力（例: `petclinic-k3s-ingest`）
-5. Scopes で **Ingest** を選択
-6. **Create** をクリックしてトークンを生成
-7. トークンをコピー（後で使用）
-
 ## 🚀 デプロイ手順
+
+### 簡単デプロイ（推奨）
+
+deploy-otel.shスクリプトを使用すると、自動的にすべての手順が実行されます:
+
+```bash
+cd otel
+./deploy-otel.sh
+```
+
+このスクリプトは以下を自動実行します:
+- user-values.yamlの設定確認
+- Helmリポジトリの追加
+- Splunk OTel Collectorのデプロイ
+- デプロイ状態の確認
+
+### 手動デプロイ
+
+手動でデプロイする場合は、以下の手順に従ってください:
 
 ### 1. ユーザー設定ファイルの作成
 
@@ -67,8 +76,7 @@ helm repo update
 # user-values.yaml から環境固有の値を読み込んでデプロイ
 helm upgrade --install splunk-otel-collector \
   splunk-otel-collector-chart/splunk-otel-collector \
-  --namespace splunk-otel \
-  --create-namespace \
+  --namespace default \
   --values values.yaml \
   --values user-values.yaml \
   --wait \
@@ -79,85 +87,13 @@ helm upgrade --install splunk-otel-collector \
 
 ```bash
 # Pod の状態を確認
-kubectl get pods -n splunk-otel
+kubectl get pods -n default -l app=splunk-otel-collector
 
 # ログを確認
-kubectl logs -n splunk-otel -l app=splunk-otel-collector --tail=50
+kubectl logs -n default -l app=splunk-otel-collector --tail=50
 
 # サービスの確認
-kubectl get svc -n splunk-otel
-```
-
-## 📊 データの確認
-
-デプロイが成功したら、以下でデータを確認できます：
-
-### Splunk Observability Cloud
-
-1. **Infrastructure Monitoring**
-   - Kubernetes Navigator で `petclinic-k3s` クラスターを確認
-   - Pod、Node、Container のメトリクスを表示
-
-2. **APM (Application Performance Monitoring)**
-   - サービスマップでマイクロサービス間の依存関係を確認
-   - トレースとスパンを表示
-
-3. **Log Observer**
-   - Kubernetes ログを検索・分析
-   - コンテナログとイベントを確認
-
-### Splunk Platform（設定した場合）
-
-Splunk Enterprise または Splunk Cloud でログデータを確認：
-
-```spl
-index="petclinic" | stats count by sourcetype
-```
-
-## 🔧 設定のカスタマイズ
-
-### ログ収集の有効化/無効化
-
-`values.yaml` で設定：
-
-```yaml
-logsCollection:
-  enabled: true  # false で無効化
-```
-
-### クラスターレシーバーの設定
-
-Kubernetesメトリクスとイベントの収集：
-
-```yaml
-clusterReceiver:
-  enabled: true
-  k8sEventsEnabled: true
-```
-
-### リソース制限の調整
-
-必要に応じて `user-values.yaml` に追加：
-
-```yaml
-agent:
-  resources:
-    limits:
-      cpu: 500m
-      memory: 512Mi
-    requests:
-      cpu: 200m
-      memory: 256Mi
-```
-
-### 自動インストルメンテーション（オプション）
-
-Java、Python、Node.js などのアプリケーションを自動的にインストルメント。
-`user-values.yaml` に追加：
-
-```yaml
-operator:
-  enabled: true
+kubectl get svc -n default -l app=splunk-otel-collector
 ```
 
 ## 🔄 アップデート
@@ -167,7 +103,7 @@ operator:
 ```bash
 helm upgrade splunk-otel-collector \
   splunk-otel-collector-chart/splunk-otel-collector \
-  --namespace splunk-otel \
+  --namespace default \
   --values values.yaml \
   --values user-values.yaml
 ```
@@ -176,10 +112,7 @@ helm upgrade splunk-otel-collector \
 
 ```bash
 # Splunk OTel Collector を削除
-helm uninstall splunk-otel-collector -n splunk-otel
-
-# Namespace を削除（オプション）
-kubectl delete namespace splunk-otel
+helm uninstall splunk-otel-collector -n default
 ```
 
 ## 📚 参考リンク
@@ -190,24 +123,9 @@ kubectl delete namespace splunk-otel
 
 ## ⚠️ 注意事項
 
+- **このプロジェクトはデモンストレーション・学習目的であり、商用利用は想定していません**
+- **本番環境での使用は推奨されません**
 - **`user-values-template.yaml` をコピーして `user-values.yaml` を作成してください**
 - **`user-values.yaml` はGitにコミットされません**（`.gitignore` で除外済み）
 - アクセストークンは安全に管理してください
-- 本番環境では、Kubernetes Secret を使用することを推奨します
-
-## 🔐 本番環境でのシークレット管理（推奨）
-
-Helm values に直接トークンを書く代わりに、Kubernetes Secret を使用：
-
-```bash
-# Kubernetes Secret を作成
-kubectl create secret generic splunk-otel-collector \
-  --from-literal=splunk_observability_access_token=YOUR_TOKEN_HERE \
-  -n splunk-otel
-
-# values.yaml で Secret を参照
-# splunkObservability:
-#   accessToken: ""
-#   accessTokenSecret: splunk-otel-collector
-```
 
