@@ -95,6 +95,7 @@ spec:
 
 ---
 # Kong Request Transformer Plugin for /api/gateway/owners/** → /owners/**
+# Works with strip-path: /api/gateway/owners/3 -> strip -> /3 -> transform -> /owners/3
 apiVersion: configuration.konghq.com/v1
 kind: KongPlugin
 metadata:
@@ -103,7 +104,7 @@ metadata:
 plugin: request-transformer
 config:
   replace:
-    uri: "/(owners.*)"
+    uri: "/owners$(uri)"
 
 ---
 # Ingress for /api/gateway/owners/** → customers-service /owners/**
@@ -113,6 +114,7 @@ metadata:
   name: gateway-owners-ingress
   namespace: petclinic
   annotations:
+    konghq.com/strip-path: "true"
     konghq.com/plugins: request-transformer-gateway-owners
     kubernetes.io/ingress.class: kong
 spec:
@@ -165,6 +167,7 @@ spec:
 
 ---
 # Kong Request Transformer Plugin for /api/gateway/pets/** → /pets/**
+# Works with strip-path: /api/gateway/pets/123 -> strip -> /123 -> transform -> /pets/123
 apiVersion: configuration.konghq.com/v1
 kind: KongPlugin
 metadata:
@@ -173,7 +176,7 @@ metadata:
 plugin: request-transformer
 config:
   replace:
-    uri: "/(pets.*)"
+    uri: "/pets$(uri)"
 
 ---
 # Ingress for /api/gateway/pets/** → customers-service /pets/**
@@ -183,6 +186,7 @@ metadata:
   name: gateway-pets-ingress
   namespace: petclinic
   annotations:
+    konghq.com/strip-path: "true"
     konghq.com/plugins: request-transformer-gateway-pets
     kubernetes.io/ingress.class: kong
 spec:
@@ -200,6 +204,7 @@ spec:
 
 ---
 # Kong Request Transformer Plugin for /api/gateway/visits/** → /visits/**
+# Works with strip-path: /api/gateway/visits/456 -> strip -> /456 -> transform -> /visits/456
 apiVersion: configuration.konghq.com/v1
 kind: KongPlugin
 metadata:
@@ -208,7 +213,7 @@ metadata:
 plugin: request-transformer
 config:
   replace:
-    uri: "/(visits.*)"
+    uri: "/visits$(uri)"
 
 ---
 # Ingress for /api/gateway/visits/** → visits-service /visits/**
@@ -218,6 +223,7 @@ metadata:
   name: gateway-visits-ingress
   namespace: petclinic
   annotations:
+    konghq.com/strip-path: "true"
     konghq.com/plugins: request-transformer-gateway-visits
     kubernetes.io/ingress.class: kong
 spec:
