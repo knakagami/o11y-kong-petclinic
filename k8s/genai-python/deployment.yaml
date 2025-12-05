@@ -136,6 +136,26 @@ spec:
         - name: OTEL_INSTRUMENTATION_GENAI_DEBUG
           value: "true"
         
+        # ========================================
+        # GenAI Evaluation Settings (LLM-as-a-Judge)
+        # ========================================
+        
+        # Condense evaluations into a single event (recommended for better visualization)
+        - name: OTEL_INSTRUMENTATION_GENAI_EVALS_RESULTS_AGGREGATION
+          value: "true"
+        
+        # Allow DeepEval to write temporary artifacts to filesystem
+        - name: DEEPEVAL_FILE_SYSTEM
+          value: "READ_WRITE"
+        
+        # Sample rate for evaluations (1.0 = 100%, evaluate all spans)
+        - name: OTEL_INSTRUMENTATION_GENAI_EVALUATION_SAMPLE_RATE
+          value: "1.0"
+        
+        # Create detailed log for each evaluation result (useful for debugging)
+        - name: OTEL_GENAI_EVAL_DEBUG_EACH
+          value: "true"
+        
         # Azure OpenAI Configuration (alternative to OpenAI)
         # - name: AZURE_OPENAI_KEY
         #   valueFrom:

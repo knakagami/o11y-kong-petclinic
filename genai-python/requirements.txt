@@ -29,5 +29,5 @@ splunk-otel-util-genai
 
 # Optional: Additional GenAI emitters and evaluators
 splunk-otel-genai-emitters-splunk
-# splunk-otel-genai-evals-deepeval  # Uncomment if using LLM-as-a-Judge evaluation
+splunk-otel-genai-evals-deepeval  # Enable LLM-as-a-Judge evaluation with DeepEval
 
