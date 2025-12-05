@@ -45,7 +45,7 @@ spec:
           value: ""
         # OpenTelemetry resource attributes
         - name: OTEL_RESOURCE_ATTRIBUTES
-          value: "service.namespace=petclinic,deployment.environment=production"
+          value: "service.namespace=petclinic,deployment.environment=o11y-custom-petclinic"
         volumeMounts:
         - name: config
           mountPath: /config

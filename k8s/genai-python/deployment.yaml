@@ -46,9 +46,27 @@ spec:
               key: openai-api-key
         - name: OPENAI_MODEL
           value: "gpt-4o-mini"
-        # OpenTelemetry resource attributes
+        # OpenTelemetry Configuration for AI Applications
+        # Resource attributes (consistent with other services)
         - name: OTEL_RESOURCE_ATTRIBUTES
-          value: "service.namespace=petclinic,deployment.environment=production"
+          value: "service.namespace=petclinic,deployment.environment=o11y-custom-petclinic"
+        # Required: Metric temporality preference for OTLP exporter
+        - name: OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
+          value: "DELTA"
+        # Enable Python logging auto-instrumentation for trace/span correlation
+        - name: OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED
+          value: "true"
+        # GenAI-specific instrumentation settings
+        # WARNING: These capture LLM input/output content. Disable in production if sensitive data is present.
+        - name: OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT
+          value: "true"
+        - name: OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT_MODE
+          value: "SPAN_AND_EVENT"
+        - name: OTEL_INSTRUMENTATION_GENAI_EMITTERS
+          value: "span_metric_event,splunk"
+        # Enable debug logging for GenAI telemetry (useful for troubleshooting)
+        - name: OTEL_INSTRUMENTATION_GENAI_DEBUG
+          value: "true"
         # Azure OpenAI Configuration (alternative to OpenAI)
         # - name: AZURE_OPENAI_KEY
         #   valueFrom:
