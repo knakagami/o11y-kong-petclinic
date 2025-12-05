@@ -20,14 +20,12 @@ python-dotenv==1.0.0
 
 # OpenTelemetry Auto-Instrumentation
 # Required for zero-code instrumentation with GenAI support
-opentelemetry-distro
-opentelemetry-exporter-otlp
+opentelemetry-distro>=0.45b0,<1.0
+opentelemetry-exporter-otlp>=1.24.0,<2.0
 
 # Splunk GenAI Instrumentation (Required for AI Agent Monitoring)
 # https://docs.splunk.com/observability/en/apm/apm-spans-traces/ai-agent-monitoring.html
 splunk-otel-util-genai
-
-# Optional: Additional GenAI emitters and evaluators
 splunk-otel-genai-emitters-splunk
 splunk-otel-genai-evals-deepeval  # Enable LLM-as-a-Judge evaluation with DeepEval
 
