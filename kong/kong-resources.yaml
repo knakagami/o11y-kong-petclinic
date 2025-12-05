@@ -384,7 +384,7 @@ config:
   resource_attributes:
     service.name: "kong-gateway"
     service.namespace: "kong-gateway-services"
-    deployment.environment: "production"
+    deployment.environment: "o11y-custom-petclinic"
   
   # Trace propagation configuration
   propagation:

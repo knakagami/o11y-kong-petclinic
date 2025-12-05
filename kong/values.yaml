@@ -32,6 +32,12 @@ gateway:
     # Plugins
     plugins: bundled
     
+    # OpenTelemetry Tracing Instrumentations
+    # Required for OpenTelemetry plugin to work properly
+    # Valid values: off, request, all, or comma-separated list
+    # (db_query, dns_query, router, http_client, balancer, plugin_rewrite, plugin_access, plugin_header_filter)
+    tracing_instrumentations: "all"
+    
   # Admin API service
   admin:
     enabled: true
@@ -65,11 +71,11 @@ ingressController:
   
   env:
     # Publish service for Kong proxy
-    publish_service: kong/kong-gateway-proxy
+    publish_service: kong/kong-kong-proxy
     
-  # Enable gateway discovery
+  # Gateway discovery (単一リリースでは使用不可、分離デプロイメント用)
   gatewayDiscovery:
-    enabled: true
+    enabled: false
     
   # Ingress class
   ingressClass: kong
