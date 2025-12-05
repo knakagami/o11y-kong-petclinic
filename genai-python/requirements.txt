@@ -12,8 +12,8 @@ langchain-openai==0.2.14
 langchain-community==0.3.31
 openai==1.109.1
 
-# Vector store
-chromadb==0.4.22
+# Vector store (updated to support NumPy 2.x)
+chromadb==0.5.23
 
 # HTTP client (version pinned)
 httpx==0.28.1
