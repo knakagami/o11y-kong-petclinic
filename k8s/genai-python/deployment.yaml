@@ -15,7 +15,9 @@ spec:
   template:
     metadata:
       annotations:
-        instrumentation.opentelemetry.io/inject-python: "default/splunk-otel-collector"
+        # OpenTelemetry Operator injection is DISABLED to avoid double instrumentation
+        # The application uses built-in zero-code instrumentation via opentelemetry-instrument
+        # All required environment variables (including K8s metadata) are configured below
       labels:
         app: genai-python
         tier: backend
@@ -46,27 +48,94 @@ spec:
               key: openai-api-key
         - name: OPENAI_MODEL
           value: "gpt-4o-mini"
-        # OpenTelemetry Configuration for AI Applications
-        # Resource attributes (consistent with other services)
+        
+        # ========================================
+        # OpenTelemetry Configuration for AI Agent Monitoring
+        # ========================================
+        
+        # Service name (required for proper identification in APM)
+        - name: OTEL_SERVICE_NAME
+          value: "genai-python"
+        
+        # OTLP Exporter endpoint (Splunk OTel Collector)
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: "http://splunk-otel-collector-agent.default.svc.cluster.local:4318"
+        
+        # OTLP Protocol (http/protobuf is the default, but making it explicit)
+        - name: OTEL_EXPORTER_OTLP_PROTOCOL
+          value: "http/protobuf"
+        
+        # Kubernetes environment information (via Downward API)
+        - name: OTEL_RESOURCE_ATTRIBUTES_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: OTEL_RESOURCE_ATTRIBUTES_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: OTEL_NODE_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        - name: OTEL_POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        
+        # Resource attributes with K8s metadata (matching Operator behavior)
         - name: OTEL_RESOURCE_ATTRIBUTES
-          value: "service.namespace=petclinic,deployment.environment=o11y-custom-petclinic"
+          value: "service.namespace=petclinic,deployment.environment=o11y-custom-petclinic,k8s.container.name=genai-python,k8s.deployment.name=genai-python,k8s.namespace.name=petclinic,k8s.node.name=$(OTEL_RESOURCE_ATTRIBUTES_NODE_NAME),k8s.pod.name=$(OTEL_RESOURCE_ATTRIBUTES_POD_NAME),service.instance.id=petclinic.$(OTEL_RESOURCE_ATTRIBUTES_POD_NAME).genai-python,service.version=latest"
+        
+        # Trace context propagation (matching Operator configuration)
+        - name: OTEL_PROPAGATORS
+          value: "tracecontext,baggage,b3"
+        
+        # Splunk-specific profiler settings (matching Operator behavior)
+        - name: SPLUNK_PROFILER_ENABLED
+          value: "true"
+        - name: SPLUNK_PROFILER_MEMORY_ENABLED
+          value: "true"
+        
         # Required: Metric temporality preference for OTLP exporter
         - name: OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
           value: "DELTA"
+        
+        # Specify exporters for each signal type
+        - name: OTEL_TRACES_EXPORTER
+          value: "otlp"
+        - name: OTEL_METRICS_EXPORTER
+          value: "otlp"
+        - name: OTEL_LOGS_EXPORTER
+          value: "otlp"
+        
         # Enable Python logging auto-instrumentation for trace/span correlation
         - name: OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED
           value: "true"
+        
+        # ========================================
         # GenAI-specific instrumentation settings
-        # WARNING: These capture LLM input/output content. Disable in production if sensitive data is present.
+        # Required for AI Agent Monitoring feature
+        # ========================================
+        
+        # Capture LLM input/output content
+        # WARNING: This captures sensitive data. Disable in production if needed.
         - name: OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT
           value: "true"
+        
+        # Where to emit captured content (both span attributes and events)
         - name: OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT_MODE
           value: "SPAN_AND_EVENT"
+        
+        # Enable Splunk-specific GenAI emitters
+        # This enables AI Agent Monitoring in Splunk Observability Cloud
         - name: OTEL_INSTRUMENTATION_GENAI_EMITTERS
           value: "span_metric_event,splunk"
+        
         # Enable debug logging for GenAI telemetry (useful for troubleshooting)
         - name: OTEL_INSTRUMENTATION_GENAI_DEBUG
           value: "true"
+        
         # Azure OpenAI Configuration (alternative to OpenAI)
         # - name: AZURE_OPENAI_KEY
         #   valueFrom:

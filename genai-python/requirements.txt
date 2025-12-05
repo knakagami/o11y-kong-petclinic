@@ -18,3 +18,16 @@ httpx==0.25.2
 # Additional dependencies
 python-dotenv==1.0.0
 
+# OpenTelemetry Auto-Instrumentation
+# Required for zero-code instrumentation with GenAI support
+opentelemetry-distro
+opentelemetry-exporter-otlp
+
+# Splunk GenAI Instrumentation (Required for AI Agent Monitoring)
+# https://docs.splunk.com/observability/en/apm/apm-spans-traces/ai-agent-monitoring.html
+splunk-otel-util-genai
+
+# Optional: Additional GenAI emitters and evaluators
+splunk-otel-genai-emitters-splunk
+# splunk-otel-genai-evals-deepeval  # Uncomment if using LLM-as-a-Judge evaluation
+

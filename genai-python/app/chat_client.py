@@ -92,21 +92,25 @@ For owners, pets or visits - provide the correct data."""
         # Get tools
         tools = self.ai_functions.get_tools()
         
-        # Create agent
+        # Create agent with metadata for AI Agent Monitoring
+        # The agent_name metadata promotes the Chain to AgentInvocation
+        # and enables proper evaluation by LLM-as-a-Judge
         agent = create_openai_functions_agent(
             llm=self.llm,
             tools=tools,
             prompt=prompt
         )
         
-        # Create agent executor
+        # Create agent executor with metadata
+        # agent_name: Identifies this agent in AI monitoring
         agent_executor = AgentExecutor(
             agent=agent,
             tools=tools,
             memory=self.memory,
             verbose=True,
             handle_parsing_errors=True,
-            max_iterations=5
+            max_iterations=5,
+            metadata={"agent_name": "petclinic_assistant"}
         )
         
         return agent_executor
