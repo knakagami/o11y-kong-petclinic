@@ -4,10 +4,11 @@ uvicorn[standard]==0.24.0
 pydantic==2.5.0
 python-multipart==0.0.6
 
-# LangChain and AI
-langchain==0.1.0
-langchain-openai==0.0.5
-langchain-community==0.0.10
+# LangChain and AI (2025 latest stable versions)
+langchain>=0.3.0,<0.4.0
+langchain-openai>=0.2.0,<0.3.0
+langchain-community>=0.3.0,<0.4.0
+openai>=1.50.0,<2.0.0
 
 # Vector store
 chromadb==0.4.22
@@ -20,8 +21,8 @@ python-dotenv==1.0.0
 
 # OpenTelemetry Auto-Instrumentation
 # Required for zero-code instrumentation with GenAI support
-opentelemetry-distro>=0.45b0,<1.0
-opentelemetry-exporter-otlp>=1.24.0,<2.0
+opentelemetry-distro
+opentelemetry-exporter-otlp
 
 # Splunk GenAI Instrumentation (Required for AI Agent Monitoring)
 # https://docs.splunk.com/observability/en/apm/apm-spans-traces/ai-agent-monitoring.html
