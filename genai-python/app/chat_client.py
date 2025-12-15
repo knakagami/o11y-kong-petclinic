@@ -92,26 +92,36 @@ For owners, pets or visits - provide the correct data."""
         # Get tools
         tools = self.ai_functions.get_tools()
         
-        # Create agent with metadata for AI Agent Monitoring
-        # The agent_name metadata promotes the Chain to AgentInvocation
-        # and enables proper evaluation by LLM-as-a-Judge
+        # Create agent with agent_name metadata for Splunk AI Agent Monitoring
+        # Per Splunk documentation: agent_name must be set at the Chain level using .with_config()
+        # This ensures the instrumentation promotes the Chain to AgentInvocation
+        # and enables LLM-as-a-Judge evaluation
+        # Reference: https://docs.splunk.com/observability/en/apm/apm-spans-traces/ai-agent-monitoring.html
         agent = create_openai_functions_agent(
             llm=self.llm,
             tools=tools,
             prompt=prompt
-        )
+        ).with_config({
+            "metadata": {
+                "agent_name": "petclinic_assistant"
+            }
+        })
         
-        # Create agent executor with metadata
-        # agent_name: Identifies this agent in AI monitoring
+        # Create agent executor with workflow_name metadata
+        # Per Splunk documentation: workflow_name promotes the Chain/Graph to a workflow
+        # This enables end-to-end workflow tracking in Splunk Observability Cloud
         agent_executor = AgentExecutor(
             agent=agent,
             tools=tools,
             memory=self.memory,
             verbose=True,
             handle_parsing_errors=True,
-            max_iterations=5,
-            metadata={"agent_name": "petclinic_assistant"}
-        )
+            max_iterations=5
+        ).with_config({
+            "metadata": {
+                "workflow_name": "petclinic_ai_workflow"
+            }
+        })
         
         return agent_executor
     
