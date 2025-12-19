@@ -4,13 +4,13 @@ uvicorn[standard]==0.34.0
 pydantic==2.10.6
 python-multipart==0.0.20
 
-# LangChain and AI (LangChain 1.x - latest stable versions)
+# LangChain and AI (LangChain 1.x - version pinned for faster builds)
 # Updated to LangChain 1.x for Splunk AI Agent Monitoring compatibility
-langchain>=1.0.0,<2.0.0
-langchain-core>=1.0.0,<2.0.0
-langchain-text-splitters>=0.3.0
-langchain-openai>=0.3.0
-langchain-community>=0.3.0
+langchain==1.0.3
+langchain-core==1.0.10
+langchain-text-splitters==0.3.7
+langchain-openai==1.1.2
+langchain-community==1.0.4
 openai==1.109.1
 
 # Vector store (updated to support NumPy 2.x)
