@@ -145,6 +145,11 @@ spec:
         - name: OTEL_INSTRUMENTATION_GENAI_EVALS_RESULTS_AGGREGATION
           value: "true"
         
+        # Specify evaluation results category for Splunk visualization
+        # This is CRITICAL for evaluation metrics to appear in Splunk APM
+        - name: OTEL_INSTRUMENTATION_GENAI_EMITTERS_EVALUATION
+          value: "replace-category:SplunkEvaluationResults"
+        
         # Allow DeepEval to write temporary artifacts to filesystem
         # Note: Splunk documentation recommends READ_ONLY, but READ_WRITE is required
         # for full evaluation functionality in this deployment
@@ -158,6 +163,23 @@ spec:
         # Create detailed log for each evaluation result (useful for debugging)
         - name: OTEL_GENAI_EVAL_DEBUG_EACH
           value: "true"
+        
+        # Debug evaluation skips to understand why evaluations might not run
+        - name: OTEL_GENAI_EVAL_DEBUG_SKIPS
+          value: "true"
+        
+        # DeepEval timeout and retry configuration
+        # Increase timeout for complex evaluations
+        - name: DEEPEVAL_PER_ATTEMPT_TIMEOUT_SECONDS_OVERRIDE
+          value: "300"
+        
+        # Retry failed evaluations up to 2 times
+        - name: DEEPEVAL_RETRY_MAX_ATTEMPTS
+          value: "2"
+        
+        # Disable DeepEval's own telemetry to avoid conflicts
+        - name: DEEPEVAL_TELEMETRY_OPT_OUT
+          value: "YES"
         
         # Azure OpenAI Configuration (alternative to OpenAI)
         # - name: AZURE_OPENAI_KEY
