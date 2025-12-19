@@ -21,7 +21,7 @@ chromadb==0.5.23
 httpx==0.28.1
 
 # Additional dependencies (version pinned)
-python-dotenv==1.0.1
+python-dotenv==1.1.1
 
 # OpenTelemetry Auto-Instrumentation (no version pinning per user request)
 # Required for zero-code instrumentation with GenAI support
