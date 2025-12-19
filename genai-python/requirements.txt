@@ -1,7 +1,7 @@
 # FastAPI and server (2025 latest stable versions - version pinned)
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
-pydantic==2.10.6
+pydantic==2.11.7
 python-multipart==0.0.20
 
 # LangChain and AI (LangChain 1.x - version pinned for faster builds)
