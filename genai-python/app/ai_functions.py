@@ -6,7 +6,8 @@ These functions are callable by the LLM to perform actions.
 import logging
 import json
 from typing import List
-from langchain.tools import tool
+# LangChain 1.x imports - updated paths
+from langchain_core.tools import tool
 
 from app.data_provider import DataProvider
 from app.vector_store import VectorStoreController

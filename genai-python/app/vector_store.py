@@ -12,7 +12,8 @@ import chromadb
 from chromadb.config import Settings
 from langchain_community.vectorstores import Chroma
 from langchain_openai import OpenAIEmbeddings, AzureOpenAIEmbeddings
-from langchain.schema import Document
+# LangChain 1.x imports - updated paths
+from langchain_core.documents import Document
 
 from app.models import Vet
 from app.data_provider import DataProvider

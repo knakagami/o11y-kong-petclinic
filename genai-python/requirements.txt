@@ -4,12 +4,13 @@ uvicorn[standard]==0.34.0
 pydantic==2.10.6
 python-multipart==0.0.20
 
-# LangChain and AI (2025 latest stable versions - version pinned)
-langchain==0.3.27
-langchain-core==0.3.80
-langchain-text-splitters==0.3.11
-langchain-openai==0.2.14
-langchain-community==0.3.31
+# LangChain and AI (LangChain 1.x - latest stable versions)
+# Updated to LangChain 1.x for Splunk AI Agent Monitoring compatibility
+langchain>=1.0.0,<2.0.0
+langchain-core>=1.0.0,<2.0.0
+langchain-text-splitters>=0.3.0
+langchain-openai>=0.3.0
+langchain-community>=0.3.0
 openai==1.109.1
 
 # Vector store (updated to support NumPy 2.x)
@@ -31,4 +32,7 @@ opentelemetry-exporter-otlp
 splunk-otel-util-genai
 splunk-otel-genai-emitters-splunk
 splunk-otel-genai-evals-deepeval
+
+# Splunk LangChain Instrumentation (required for LangChain 1.x compatibility)
+splunk-otel-instrumentation-langchain
 

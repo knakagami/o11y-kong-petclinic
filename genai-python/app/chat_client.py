@@ -6,11 +6,12 @@ This module handles chat interactions with the LLM and function calling.
 import os
 import logging
 from typing import Optional
+# LangChain 1.x imports - updated paths
 from langchain.agents import AgentExecutor, create_openai_functions_agent
 from langchain_openai import ChatOpenAI, AzureChatOpenAI
 from langchain.memory import ConversationBufferMemory
-from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain.schema import SystemMessage
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.messages import SystemMessage
 
 from app.ai_functions import AIFunctions
 from app.data_provider import DataProvider
