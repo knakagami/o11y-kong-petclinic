@@ -6,19 +6,10 @@ This module handles chat interactions with the LLM and function calling.
 import os
 import logging
 from typing import Optional
-# LangChain 1.x imports - updated paths for compatibility
-# AgentExecutor moved to langchain package in v1.x
-try:
-    from langchain.agents import AgentExecutor, create_openai_functions_agent
-except ImportError:
-    # Fallback for different module structure
-    from langchain.agents.agent import AgentExecutor
-    from langchain.agents.openai_functions_agent.base import create_openai_functions_agent
-
+# LangChain 1.x imports - using new create_agent API
+from langchain.agents import create_agent
 from langchain_openai import ChatOpenAI, AzureChatOpenAI
-from langchain.memory import ConversationBufferMemory
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import HumanMessage, AIMessage
 
 from app.ai_functions import AIFunctions
 from app.data_provider import DataProvider
@@ -40,15 +31,11 @@ class PetclinicChatClient:
         # Initialize LLM
         self.llm = self._init_llm()
         
-        # Initialize memory
-        self.memory = ConversationBufferMemory(
-            memory_key="chat_history",
-            return_messages=True,
-            max_token_limit=2000  # Approximately 10 messages
-        )
+        # Conversation history (stored in memory)
+        self.messages = []
         
-        # Create agent
-        self.agent_executor = self._create_agent()
+        # Create agent graph
+        self.agent_graph = self._create_agent()
     
     def _init_llm(self):
         """Initialize the appropriate LLM based on environment variables"""
@@ -73,8 +60,8 @@ class PetclinicChatClient:
                 openai_api_key=openai_key
             )
     
-    def _create_agent(self) -> AgentExecutor:
-        """Create the LangChain agent with tools and memory"""
+    def _create_agent(self):
+        """Create the LangChain agent graph with tools"""
         
         # System prompt matching the Spring version
         system_message = """You are a friendly AI assistant designed to help with the management of a veterinarian pet clinic called Spring Petclinic.
@@ -89,49 +76,25 @@ When dealing with vets, if the user is unsure about the returned results, explai
 
 For owners, pets or visits - provide the correct data."""
         
-        # Create prompt template
-        prompt = ChatPromptTemplate.from_messages([
-            SystemMessage(content=system_message),
-            MessagesPlaceholder(variable_name="chat_history"),
-            ("human", "{input}"),
-            MessagesPlaceholder(variable_name="agent_scratchpad")
-        ])
-        
         # Get tools
         tools = self.ai_functions.get_tools()
         
-        # Create agent with agent_name metadata for Splunk AI Agent Monitoring
-        # Per Splunk documentation: agent_name must be set at the Chain level using .with_config()
-        # This ensures the instrumentation promotes the Chain to AgentInvocation
-        # and enables LLM-as-a-Judge evaluation
+        # Create agent using LangChain 1.x API with Splunk AI Agent Monitoring metadata
+        # Per Splunk documentation: agent_name and workflow_name should be set via metadata
         # Reference: https://docs.splunk.com/observability/en/apm/apm-spans-traces/ai-agent-monitoring.html
-        agent = create_openai_functions_agent(
-            llm=self.llm,
+        agent_graph = create_agent(
+            model=self.llm,
             tools=tools,
-            prompt=prompt
+            system_prompt=system_message,
+            debug=True
         ).with_config({
             "metadata": {
-                "agent_name": "petclinic_assistant"
-            }
-        })
-        
-        # Create agent executor with workflow_name metadata
-        # Per Splunk documentation: workflow_name promotes the Chain/Graph to a workflow
-        # This enables end-to-end workflow tracking in Splunk Observability Cloud
-        agent_executor = AgentExecutor(
-            agent=agent,
-            tools=tools,
-            memory=self.memory,
-            verbose=True,
-            handle_parsing_errors=True,
-            max_iterations=5
-        ).with_config({
-            "metadata": {
+                "agent_name": "petclinic_assistant",
                 "workflow_name": "petclinic_ai_workflow"
             }
         })
         
-        return agent_executor
+        return agent_graph
     
     async def chat(self, query: str) -> str:
         """
@@ -146,21 +109,34 @@ For owners, pets or visits - provide the correct data."""
         try:
             logger.info(f"Processing chat query: {query}")
             
-            # Invoke the agent
-            response = await self.agent_executor.ainvoke({"input": query})
+            # Add user message to conversation history
+            self.messages.append(HumanMessage(content=query))
             
-            # Extract the output
-            output = response.get("output", "I'm sorry, I couldn't process that request.")
+            # Invoke the agent graph with messages
+            response = await self.agent_graph.ainvoke({"messages": self.messages})
             
-            logger.info(f"Chat response generated successfully")
-            return output
+            # Extract the AI messages from response
+            ai_messages = [msg for msg in response.get("messages", []) if isinstance(msg, AIMessage)]
+            
+            if ai_messages:
+                # Get the last AI message
+                last_ai_message = ai_messages[-1]
+                output = last_ai_message.content
+                
+                # Update conversation history with the response
+                self.messages = response.get("messages", self.messages)
+                
+                logger.info(f"Chat response generated successfully")
+                return output
+            else:
+                return "I'm sorry, I couldn't process that request."
             
         except Exception as e:
-            logger.error(f"Error processing chat message: {e}")
+            logger.error(f"Error processing chat message: {e}", exc_info=True)
             return "Chat is currently unavailable. Please try again later."
     
     def reset_memory(self):
         """Reset the conversation memory"""
-        self.memory.clear()
+        self.messages = []
         logger.info("Conversation memory reset")
 
