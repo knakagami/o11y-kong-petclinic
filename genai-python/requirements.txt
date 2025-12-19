@@ -6,10 +6,10 @@ python-multipart==0.0.20
 
 # LangChain and AI (LangChain 1.x - version pinned for faster builds)
 # Updated to LangChain 1.x for Splunk AI Agent Monitoring compatibility
-# Using compatible versions across all langchain packages
+# Using compatible versions - langchain-core 1.2系で統一
 langchain==1.0.3
-langchain-core==1.0.7
-langchain-text-splitters==1.0.0
+langchain-core==1.2.3
+langchain-text-splitters==1.1.0
 langchain-openai==1.1.2
 langchain-community==0.4.1
 openai==1.109.1
