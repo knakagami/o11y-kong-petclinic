@@ -181,6 +181,16 @@ spec:
         - name: DEEPEVAL_TELEMETRY_OPT_OUT
           value: "YES"
         
+        # ========================================
+        # Disable OpenAI v2 instrumentation
+        # Reason: OpenAI v2 instrumentation has a bug with LangChain 1.x
+        # LangChain 1.x uses with_raw_response.create() which returns LegacyAPIResponse
+        # but OTel instrumentation expects ChatCompletion object
+        # LangChain instrumentation will still capture OpenAI calls
+        # ========================================
+        - name: OTEL_PYTHON_DISABLED_INSTRUMENTATIONS
+          value: "openai_v2"
+        
         # Azure OpenAI Configuration (alternative to OpenAI)
         # - name: AZURE_OPENAI_KEY
         #   valueFrom:
