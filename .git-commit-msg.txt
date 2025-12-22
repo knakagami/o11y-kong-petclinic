@@ -1,0 +1,9 @@
+fix: Use GitHub latest opentelemetry-instrumentation-openai-v2 with LegacyAPIResponse fix
+
+- Add git+https://github.com/open-telemetry/opentelemetry-python-contrib.git@main#subdirectory=instrumentation-genai/opentelemetry-instrumentation-openai-v2
+- Remove OTEL_PYTHON_DISABLED_INSTRUMENTATIONS workaround
+- Includes PR #4017 fix for 'LegacyAPIResponse' object has no attribute 'model'
+- Will be replaced with PyPI version once 2.3.0 is released
+
+Fixes: https://github.com/open-telemetry/opentelemetry-python-contrib/issues/4002
+

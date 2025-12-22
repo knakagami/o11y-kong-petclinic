@@ -132,10 +132,6 @@ spec:
         - name: OTEL_INSTRUMENTATION_GENAI_EMITTERS
           value: "span_metric_event,splunk"
         
-        # Enable debug logging for GenAI telemetry (useful for troubleshooting)
-        - name: OTEL_INSTRUMENTATION_GENAI_DEBUG
-          value: "true"
-        
         # ========================================
         # GenAI Evaluation Settings (LLM-as-a-Judge)
         # Required for Splunk AI Agent Monitoring evaluations
@@ -180,16 +176,6 @@ spec:
         # Disable DeepEval's own telemetry to avoid conflicts
         - name: DEEPEVAL_TELEMETRY_OPT_OUT
           value: "YES"
-        
-        # ========================================
-        # Disable OpenAI v2 instrumentation
-        # Reason: OpenAI v2 instrumentation has a bug with LangChain 1.x
-        # LangChain 1.x uses with_raw_response.create() which returns LegacyAPIResponse
-        # but OTel instrumentation expects ChatCompletion object
-        # LangChain instrumentation will still capture OpenAI calls
-        # ========================================
-        - name: OTEL_PYTHON_DISABLED_INSTRUMENTATIONS
-          value: "openai_v2"
         
         # Azure OpenAI Configuration (alternative to OpenAI)
         # - name: AZURE_OPENAI_KEY

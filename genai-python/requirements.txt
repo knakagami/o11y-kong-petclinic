@@ -37,3 +37,10 @@ splunk-otel-genai-evals-deepeval
 # Splunk LangChain Instrumentation (required for LangChain 1.x compatibility)
 splunk-otel-instrumentation-langchain
 
+# OpenAI v2 Instrumentation with LegacyAPIResponse fix
+# Using latest from GitHub (includes PR #4017 fix for 'LegacyAPIResponse' object has no attribute 'model')
+# This will be replaced with PyPI version once 2.3.0 is released
+# Issue: https://github.com/open-telemetry/opentelemetry-python-contrib/issues/4002
+# Fix: https://github.com/open-telemetry/opentelemetry-python-contrib/pull/4017
+git+https://github.com/open-telemetry/opentelemetry-python-contrib.git@main#subdirectory=instrumentation-genai/opentelemetry-instrumentation-openai-v2
+
