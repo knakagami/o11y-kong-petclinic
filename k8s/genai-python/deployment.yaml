@@ -118,6 +118,10 @@ spec:
         # Required for AI Agent Monitoring feature
         # ========================================
         
+        # Enable GenAI instrumentation debug mode for troubleshooting
+        - name: OTEL_INSTRUMENTATION_GENAI_DEBUG
+          value: "true"
+        
         # Capture LLM input/output content
         # WARNING: This captures sensitive data. Disable in production if needed.
         - name: OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT
