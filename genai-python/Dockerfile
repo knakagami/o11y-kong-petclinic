@@ -42,5 +42,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 
 # Run the application with OpenTelemetry auto-instrumentation
 # This wraps the application with zero-code instrumentation
-CMD ["opentelemetry-instrument", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8084"]
+# Use --loop asyncio instead of uvloop to fix OpenTelemetry context propagation
+CMD ["opentelemetry-instrument", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8084", "--loop", "asyncio"]
 

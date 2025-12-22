@@ -27,8 +27,6 @@ spec:
       - name: genai-python
         image: genai-python:latest
         imagePullPolicy: Never  # For local k3s, use local image
-        # Use standard asyncio event loop instead of uvloop to fix context propagation
-        command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8084", "--loop", "asyncio"]
         ports:
         - containerPort: 8084
           name: http
