@@ -5,6 +5,13 @@ Spring PetClinic GenAI Service - Python Implementation
 
 import logging
 import os
+# #region agent log
+import json
+def _debug_log(location, message, data, hypothesis_id):
+    import time
+    log_entry = json.dumps({"location": location, "message": message, "data": data, "hypothesisId": hypothesis_id, "timestamp": int(time.time()*1000)})
+    print(f"[DEBUG] {log_entry}", flush=True)
+# #endregion
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse, PlainTextResponse
@@ -128,11 +135,19 @@ async def chat_endpoint(request: Request):
         
         logger.info(f"Received chat request: {query_text[:100]}...")
         
+        # #region agent log
+        _debug_log("main.py:chat_endpoint", "Chat request received", {"query": query_text[:50], "msg_count_before": len(chat_client.messages) if chat_client else 0, "client_id": id(chat_client)}, "A")
+        # #endregion
+        
         # Get response from chat client
         if not chat_client:
             raise HTTPException(status_code=503, detail="Chat client not initialized")
         
         response = await chat_client.chat(query_text)
+        
+        # #region agent log
+        _debug_log("main.py:chat_endpoint", "Chat response generated", {"response_len": len(response), "msg_count_after": len(chat_client.messages) if chat_client else 0}, "A")
+        # #endregion
         
         # Return plain text response
         return PlainTextResponse(content=response)
@@ -150,9 +165,15 @@ async def chat_endpoint(request: Request):
 @app.post("/chat/reset")
 async def reset_chat_memory():
     """Reset the conversation memory"""
+    # #region agent log
+    _debug_log("main.py:reset_chat_memory", "Reset endpoint called", {"msg_count_before": len(chat_client.messages) if chat_client else 0}, "C")
+    # #endregion
     try:
         if chat_client:
             chat_client.reset_memory()
+            # #region agent log
+            _debug_log("main.py:reset_chat_memory", "Memory reset complete", {"msg_count_after": len(chat_client.messages)}, "C")
+            # #endregion
             return {"status": "success", "message": "Conversation memory reset"}
         else:
             raise HTTPException(status_code=503, detail="Chat client not initialized")

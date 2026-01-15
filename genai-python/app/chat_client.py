@@ -6,6 +6,13 @@ This module handles chat interactions with the LLM and function calling.
 import os
 import logging
 from typing import Optional
+# #region agent log
+import json
+def _debug_log(location, message, data, hypothesis_id):
+    import time
+    log_entry = json.dumps({"location": location, "message": message, "data": data, "hypothesisId": hypothesis_id, "timestamp": int(time.time()*1000)})
+    print(f"[DEBUG] {log_entry}", flush=True)
+# #endregion
 # LangChain 1.x imports - using new create_agent API
 from langchain.agents import create_agent
 from langchain_openai import ChatOpenAI, AzureChatOpenAI
@@ -109,6 +116,10 @@ For owners, pets or visits - provide the correct data."""
         try:
             logger.info(f"Processing chat query: {query}")
             
+            # #region agent log
+            _debug_log("chat_client.py:chat", "Chat method entry", {"query": query[:30], "history_len": len(self.messages), "instance_id": id(self)}, "A")
+            # #endregion
+            
             # Add user message to conversation history
             self.messages.append(HumanMessage(content=query))
             
@@ -137,6 +148,9 @@ For owners, pets or visits - provide the correct data."""
     
     def reset_memory(self):
         """Reset the conversation memory"""
+        # #region agent log
+        _debug_log("chat_client.py:reset_memory", "Reset called", {"history_len_before": len(self.messages)}, "C")
+        # #endregion
         self.messages = []
         logger.info("Conversation memory reset")
 
