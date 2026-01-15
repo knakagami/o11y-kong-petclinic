@@ -149,6 +149,13 @@ async def chat_endpoint(request: Request):
         _debug_log("main.py:chat_endpoint", "Chat response generated", {"response_len": len(response), "msg_count_after": len(chat_client.messages) if chat_client else 0}, "A")
         # #endregion
         
+        # Clear conversation history after each request to prevent history from persisting across browser reloads
+        chat_client.reset_memory()
+        
+        # #region agent log
+        _debug_log("main.py:chat_endpoint", "Memory auto-cleared", {"msg_count_after_reset": len(chat_client.messages)}, "A")
+        # #endregion
+        
         # Return plain text response
         return PlainTextResponse(content=response)
         
