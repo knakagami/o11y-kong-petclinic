@@ -37,14 +37,14 @@ Spring PetClinicをマイクロサービスとして実装し、Kong API Gateway
 
 2. **Splunk Observability Cloud統合** - フルスタックオブザーバビリティ
    - OpenTelemetry Collectorによるメトリクス・トレース・ログ収集
-   - OpenTelemetry Operatorによる自動計装（Java/Python）
+   - OpenTelemetry Operatorによる自動計装（Java）、ビルトイン計装（Python）
    - APM、Infrastructure Monitoring、Log Observer
 
 3. **Angular SPA Web UI** - ブラウザからアクセス可能なフロントエンド
    - ペットオーナー、ペット、獣医師の管理
    - AI チャット機能（GenAI Service）
 
-4. **Python版GenAI Service** - FastAPI + LangChain実装
+4. **Python版GenAI Service** - FastAPI + LangChain 1.x実装
    - OpenAI API統合
    - RAG（Retrieval-Augmented Generation）
    - 会話型AIエージェント
@@ -190,6 +190,10 @@ OTel Collector が受信したトレース:
 
 **役割**: API管理とルーティング
 
+**バージョン**:
+- Kong Gateway: 3.8
+- Kong Ingress Controller: 3.3
+
 **主要機能**:
 - **Kubernetes Ingress Controller**: Kubernetesネイティブな設定管理
 - **Lua Pre-function Plugin**: 高度なパス書き換え
@@ -214,10 +218,11 @@ OTel Collector が受信したトレース:
 
 **自動計装**:
 - **Java services**: OpenTelemetry Java Agent
-  - 環境変数設定なしで自動計装
+  - OpenTelemetry Operatorによる自動インジェクション
   - Annotation: `instrumentation.opentelemetry.io/inject-java: "default/splunk-otel-collector"`
-- **Python services**: OpenTelemetry Python Agent
-  - Annotation: `instrumentation.opentelemetry.io/inject-python: "default/splunk-otel-collector"`
+- **Python services (GenAI Python)**: OpenTelemetry Python Agent
+  - Dockerイメージにビルトインされたゼロコード計装（`opentelemetry-instrument`コマンド使用）
+  - Operatorアノテーションは使用せず、すべての設定を環境変数で管理
 
 **データフロー**:
 ```
@@ -251,10 +256,11 @@ Application → OTel Agent (Init Container) → OTel Collector (Agent) → Splun
 - 獣医師情報の管理
 - Endpoints: `/vets`
 
-#### GenAI Python Service (Port 8085)
-- AI チャット機能（FastAPI + LangChain）
+#### GenAI Python Service (Kubernetesサービスポート: 8085、コンテナ内部ポート: 8084)
+- AI チャット機能（FastAPI + LangChain 1.x）
 - OpenAI API統合
 - Endpoints: `/chatclient`, `/health`, `/info`
+- 注意: コンテナ内部では8084ポートで動作し、Kubernetesサービスが8085にマッピング
 
 #### Admin Server (Port 9090)
 - Spring Boot Admin による監視
@@ -505,11 +511,11 @@ cd otel
 ```
 
 このスクリプトは以下を実行します：
-1. cert-managerのインストール（Operator用）
-2. Splunk OTel Collector Helmリポジトリの追加
-3. `values.yaml` と `user-values.yaml` をマージしてインストール
-4. Collector Agentの起動（DaemonSet）
-5. Operatorの起動（自動計装管理）
+1. Splunk OTel Collector Helmリポジトリの追加
+2. `values.yaml` と `user-values.yaml` をマージしてインストール
+3. Collector Agentの起動（DaemonSet）
+4. Operatorの起動（自動計装管理）
+5. 必要な依存関係（cert-managerなど）はHelmチャートが自動的にインストール
 
 **デプロイ時間**: 約3-5分
 
@@ -526,7 +532,7 @@ kubectl get pods -n petclinic
 # Kong Gatewayの確認
 kubectl get pods -n kong
 
-# OpenTelemetry Collectorの確認
+# OpenTelemetry Collectorの確認（defaultネームスペースにデプロイ）
 kubectl get pods -n default -l app=splunk-otel-collector
 
 # すべてのIngressの確認
@@ -682,7 +688,7 @@ curl http://localhost:8001/plugins | jq '.data[] | {name, enabled}'
 
 **設定方法**:
 ```yaml
-# k8s/*/deployment.yaml
+# k8s/*/deployment.yaml (Java Services)
 metadata:
   annotations:
     # OpenTelemetry Operatorによる自動計装
@@ -692,7 +698,7 @@ spec:
   - env:
     # リソース属性の設定
     - name: OTEL_RESOURCE_ATTRIBUTES
-      value: "service.namespace=petclinic,deployment.environment=production"
+      value: "service.namespace=petclinic,deployment.environment=o11y-custom-petclinic"
 ```
 
 **効果**:
@@ -700,26 +706,37 @@ spec:
 - データベースクエリの自動トレース
 - JVM メトリクスの自動収集
 - トレースコンテキストの自動伝搬
-- リソース属性の自動付与（`service.namespace=petclinic`, `deployment.environment=production`）
+- リソース属性の自動付与（`service.namespace=petclinic`, `deployment.environment=o11y-custom-petclinic`）
 
 #### Python Services
 
-GenAI Python ServiceはOpenTelemetry Python Agentで自動計装されています。
+GenAI Python ServiceはDockerイメージにビルトインされたOpenTelemetry Python Agentで計装されています。
+
+**計装方式**:
+- Dockerイメージのビルド時に `opentelemetry-distro` と計装ライブラリをインストール
+- コンテナ起動時に `opentelemetry-instrument` コマンドでアプリケーションをラップ
+- OpenTelemetry Operatorのアノテーションは**使用しない**（二重計装を回避）
 
 **設定方法**:
 ```yaml
 # k8s/genai-python/deployment.yaml
 metadata:
   annotations:
-    # OpenTelemetry Operatorによる自動計装
-    instrumentation.opentelemetry.io/inject-python: "default/splunk-otel-collector"
+    # Operatorアノテーションはコメントアウト（ビルトイン計装を使用）
+    # instrumentation.opentelemetry.io/inject-python: "default/splunk-otel-collector"
 spec:
   containers:
   - env:
-    # リソース属性の設定
+    # OpenTelemetry設定（環境変数で完全制御）
+    - name: OTEL_SERVICE_NAME
+      value: "genai-python"
+    - name: OTEL_EXPORTER_OTLP_ENDPOINT
+      value: "http://splunk-otel-collector-agent.default.svc.cluster.local:4318"
     - name: OTEL_RESOURCE_ATTRIBUTES
-      value: "service.namespace=petclinic,deployment.environment=production"
+      value: "service.namespace=petclinic,deployment.environment=o11y-custom-petclinic,..."
 ```
+
+詳細は [`genai-python/Dockerfile`](genai-python/Dockerfile) と [`k8s/genai-python/deployment.yaml`](k8s/genai-python/deployment.yaml) を参照してください。
 
 #### Spring Boot Zipkinの無効化
 
@@ -788,19 +805,19 @@ config:
    
    ```bash
    # 1. otel/user-values.yaml
-   environment: "production"
+   environment: "o11y-custom-petclinic"  # または任意の環境名
    
    # 2. kong/kong-resources.yaml
    resource_attributes:
-     deployment.environment: "production"  # ← 一致させる
+     deployment.environment: "o11y-custom-petclinic"  # ← 一致させる
    
    # 3. k8s/*/deployment.yaml (全マイクロサービス)
    env:
    - name: OTEL_RESOURCE_ATTRIBUTES
-     value: "service.namespace=petclinic,deployment.environment=production"  # ← 一致させる
+     value: "service.namespace=petclinic,deployment.environment=o11y-custom-petclinic"  # ← 一致させる
    ```
    
-   環境を変更する場合は、これら3箇所を手動で更新してください。
+   現在のデフォルト値は `o11y-custom-petclinic` です。環境を変更する場合は、これら3箇所を手動で更新してください。
 
 2. **Kong 4.0 以降の変更**
    
@@ -967,4 +984,4 @@ Issue、Pull Request、フィードバックを歓迎します！
 ---
 
 **Author**: Generated with Cursor AI  
-**Last Updated**: 2025-11-26
+**Last Updated**: 2026-01-28

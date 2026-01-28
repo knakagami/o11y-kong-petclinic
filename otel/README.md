@@ -9,6 +9,8 @@
 - `helm` がインストールされていること（v3.0+）
 - Splunk Observability Cloud のアカウントとアクセストークン
 
+**注意**: Helmチャートは必要な依存関係（cert-managerなど）を自動的にインストールします。事前のインストールは不要です。
+
 ## 🚀 デプロイ手順
 
 ### 簡単デプロイ（推奨）
@@ -49,6 +51,10 @@ vi user-values.yaml
 | `clusterName` | クラスター名（識別用） |
 | `environment` | 環境名（production, staging, devなど） |
 
+**⚠️ 重要**: `environment` の値は、各マイクロサービスのdeployment.yamlの `deployment.environment` と統一することを推奨します。
+- 現在のデフォルト値: user-values-template.yamlでは `production`、各deployment.yamlでは `o11y-custom-petclinic`
+- トレースの相関を正しく行うため、これらの値を統一してください
+
 **オプション: Splunk Platform（Splunk Enterprise/Cloud）への送信:**
 
 Splunk Platform にもデータを送信する場合は、`splunkPlatform` セクションを設定してください：
@@ -71,6 +77,13 @@ helm repo update
 ```
 
 ### 3. Splunk OTel Collector のデプロイ
+
+**デプロイ先**: defaultネームスペース
+
+OpenTelemetry Collectorは `default` ネームスペースにデプロイされます。これは以下の理由によります：
+- OpenTelemetry Operatorが `default` ネームスペースで動作
+- 各ネームスペースのPodからアクセスしやすい（`splunk-otel-collector-agent.default.svc.cluster.local`）
+- クラスタ全体のメトリクス・ログ収集を一元管理
 
 ```bash
 # user-values.yaml から環境固有の値を読み込んでデプロイ
@@ -121,6 +134,21 @@ helm uninstall splunk-otel-collector -n default
 - [Splunk Observability Cloud ドキュメント](https://docs.splunk.com/Observability)
 - [OpenTelemetry ドキュメント](https://opentelemetry.io/docs/)
 
+## 📝 values.yaml の設定内容
+
+[`values.yaml`](values.yaml) には環境非依存の基本設定が含まれています：
+
+| 設定項目 | 説明 |
+|---------|------|
+| `gateway.enabled: false` | ゲートウェイモードを無効化（エージェントモードのみ使用） |
+| `agent.enabled: true` | エージェントモード（DaemonSet）を有効化 |
+| `logsCollection.containers.enabled: true` | コンテナログ収集を有効化 |
+| `clusterReceiver.enabled: true` | Kubernetesメトリクス収集を有効化 |
+| `operator.enabled: true` | OpenTelemetry Operatorを有効化（Java自動計装用） |
+| `tolerations` | コントロールプレーンノードへのデプロイを許可 |
+
+詳細は [`values.yaml`](values.yaml) を参照してください。
+
 ## ⚠️ 注意事項
 
 - **このプロジェクトはデモンストレーション・学習目的であり、商用利用は想定していません**
@@ -128,4 +156,5 @@ helm uninstall splunk-otel-collector -n default
 - **`user-values-template.yaml` をコピーして `user-values.yaml` を作成してください**
 - **`user-values.yaml` はGitにコミットされません**（`.gitignore` で除外済み）
 - アクセストークンは安全に管理してください
+- **環境変数の統一**: `user-values.yaml` の `environment` と各deployment.yamlの `deployment.environment` を統一することを推奨
 

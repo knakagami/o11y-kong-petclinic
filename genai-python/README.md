@@ -10,7 +10,7 @@ Python実装のSpring PetClinic GenAIサービスです。FastAPIとLangChainを
 
 ### 1. 会話型AIチャットボット
 - OpenAI GPT-4o-miniまたはAzure OpenAI GPT-4oを使用
-- 10メッセージまでの会話履歴を保持
+- 会話履歴を保持（メモリベース、リクエスト毎にクリア）
 - 自然言語での質問応答
 
 ### 2. Function Calling（ツール呼び出し）
@@ -35,24 +35,26 @@ LLMが自動的に適切な関数を呼び出します：
 
 ## 技術スタック
 
-- **フレームワーク**: FastAPI 0.104.1
-- **LLM統合**: LangChain 0.1.0、langchain-openai
-- **ベクターストア**: Chroma 0.4.22
-- **HTTPクライアント**: httpx 0.25.2
+- **フレームワーク**: FastAPI 0.115.6
+- **LLM統合**: LangChain 1.0.3、langchain-openai 1.1.2
+- **ベクターストア**: Chroma 0.5.23
+- **HTTPクライアント**: httpx 0.28.1
 - **Python**: 3.11
 
 ## Spring版との機能対応
 
 | 機能 | Spring版 | Python版 |
 |-----|---------|---------|
-| チャットAPI | Spring AI ChatClient | LangChain Agent |
+| チャットAPI | Spring AI ChatClient | LangChain Agent (create_agent) |
 | Function Calling | @Bean Functions | LangChain Tools |
 | RAG | SimpleVectorStore | Chroma |
-| メモリ | MessageChatMemoryAdvisor | ConversationBufferMemory |
+| メモリ | MessageChatMemoryAdvisor | ConversationBufferMemory（リクエスト毎にクリア） |
 | OpenAI | spring-ai-openai | langchain-openai |
 | ヘルスチェック | Spring Actuator | FastAPI endpoint |
-| ポート | 8084 | 8084 (コンテナ内) |
-| サービスポート | 8084 | 8085 (Kubernetes) |
+| コンテナ内部ポート | 8084 | 8084 |
+| Kubernetesサービスポート | 8084 | 8085 |
+
+**注意**: コンテナは8084ポートでリッスンしますが、Kubernetesサービスは8085ポートにマッピングされています（[`k8s/genai-python/service.yaml`](../k8s/genai-python/service.yaml)参照）。
 
 ## セットアップ
 
@@ -136,7 +138,11 @@ cd genai-python
 ./build-docker.sh
 ```
 
-または
+このスクリプトは以下を実行します:
+- Dockerイメージのビルド（`genai-python:latest`）
+- バージョンタグの作成（`genai-python:v1.0.0`）
+
+または手動でビルド:
 
 ```bash
 docker build -t genai-python:latest .
@@ -151,6 +157,8 @@ docker run -p 8085:8084 \
   -e VETS_SERVICE_URL="http://host.docker.internal:8083" \
   genai-python:latest
 ```
+
+**ポート説明**: `-p 8085:8084` はホストの8085ポートをコンテナ内部の8084ポートにマッピングします。
 
 ### k3sへのイメージインポート
 
@@ -194,33 +202,60 @@ kubectl create secret generic genai-secrets \
       key: openai-api-key
 ```
 
-### OpenTelemetry自動計装
+### OpenTelemetryビルトイン計装
 
-このサービスはOpenTelemetry Operatorによって自動的に計装されます。
+このサービスは**Dockerイメージにビルトインされた**OpenTelemetry計装を使用します。
 
-Deployment YAMLに以下の設定があります:
+#### 計装方式
+
+OpenTelemetry Operatorのアノテーションは**使用していません**。代わりに、以下の方法で計装しています：
+
+1. **ビルド時**: Dockerfileで計装ライブラリをインストール
+   ```dockerfile
+   RUN pip install --no-cache-dir -r requirements.txt
+   RUN opentelemetry-bootstrap -a install
+   ```
+
+2. **起動時**: `opentelemetry-instrument` コマンドでアプリケーションをラップ
+   ```dockerfile
+   CMD ["opentelemetry-instrument", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8084", "--loop", "asyncio"]
+   ```
+
+詳細は [`Dockerfile`](Dockerfile) 26-46行目を参照してください。
+
+#### Deployment設定
+
+[`k8s/genai-python/deployment.yaml`](../k8s/genai-python/deployment.yaml) では:
 
 ```yaml
 metadata:
   annotations:
-    # OpenTelemetry Operatorによる自動計装
-    instrumentation.opentelemetry.io/inject-python: "default/splunk-otel-collector"
+    # OpenTelemetry Operator injection is DISABLED to avoid double instrumentation
+    # The application uses built-in zero-code instrumentation via opentelemetry-instrument
+    # All required environment variables (including K8s metadata) are configured below
 spec:
   containers:
   - env:
-    # リソース属性の設定
+    # OpenTelemetry設定（環境変数で完全制御）
+    - name: OTEL_SERVICE_NAME
+      value: "genai-python"
+    - name: OTEL_EXPORTER_OTLP_ENDPOINT
+      value: "http://splunk-otel-collector-agent.default.svc.cluster.local:4318"
     - name: OTEL_RESOURCE_ATTRIBUTES
-      value: "service.namespace=petclinic,deployment.environment=production"
+      value: "service.namespace=petclinic,deployment.environment=o11y-custom-petclinic,..."
 ```
 
+**重要**: Operatorアノテーション（`instrumentation.opentelemetry.io/inject-python`）は**コメントアウト**されています。これは二重計装を避けるためです。
+
 これにより、以下が自動的に実行されます:
-- OpenTelemetry Python Agentのインジェクション
+- FastAPI、LangChain、OpenAIの自動トレーシング
 - 分散トレーシングの有効化
 - メトリクスとログの収集
-- リソース属性の自動付与（`service.namespace=petclinic`, `deployment.environment=production`）
+- Splunk AI Agent Monitoring対応
+- リソース属性の自動付与（`service.namespace=petclinic`, `deployment.environment=o11y-custom-petclinic`）
 
 注意: 
-- 自動計装により、メモリとCPUのリソース使用量が増加します
+- 計装により、メモリとCPUのリソース使用量が増加します
 - `deployment.environment` の値は `otel/user-values.yaml` の `environment` と一致させてください
 
 ### デプロイ
@@ -266,6 +301,8 @@ curl -X POST http://genai-python:8085/chatclient \
   -d "List all the owners"
 ```
 
+**注意**: サービス内部では8084ポートで動作していますが、Kubernetesサービスは8085ポートで公開されています。
+
 ### その他のエンドポイント
 
 - `GET /health` - ヘルスチェック
@@ -304,11 +341,11 @@ genai-python/
 │   ├── data_provider.py     # 他サービス連携
 │   ├── vector_store.py      # RAG/ベクターストア
 │   ├── ai_functions.py      # LangChain Tools
-│   └── chat_client.py       # チャットエージェント
-├── Dockerfile
-├── requirements.txt
+│   └── chat_client.py       # チャットエージェント（LangChain create_agent API使用）
+├── Dockerfile               # OpenTelemetry計装をビルトイン
+├── requirements.txt         # 依存パッケージ（LangChain 1.x系）
 ├── .dockerignore
-├── build-docker.sh
+├── build-docker.sh          # ビルドスクリプト（v1.0.0タグも作成）
 └── README.md
 ```
 
@@ -338,5 +375,5 @@ mypy app/
 - **本番環境での使用は推奨されません**
 - OpenAI APIの使用には料金が発生します
 - ベクターストアの初期化時に埋め込み生成が行われます（初回のみ）
-- 会話履歴はメモリ内に保持され、Pod再起動でリセットされます
+- 会話履歴はメモリ内に保持され、各リクエスト後に自動クリアされます
 
